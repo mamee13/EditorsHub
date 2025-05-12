@@ -1,0 +1,174 @@
+Here’s your **6-Day Fullstack Roadmap**, formatted like a clear card-based plan. Each “card” represents one day’s work with key features, models, routes, and deliverables. You can copy/paste or print these as a checklist-style guide while building your app.
+
+---
+
+## 🚀 **Day 1: Backend Setup + Supabase Auth + User Profiles**
+
+🧱 **Goal**: Create the foundational backend with Supabase JWT auth, user roles, and profile setup.
+
+### 📌 Tasks:
+
+* Init Express + connect MongoDB Atlas
+* Setup Supabase JWT verification middleware
+* Create `User` model:
+
+  * `role`: client | editor
+  * `profile`: name, bio, avatar, portfolio
+* Routes:
+
+  * `GET /me`
+  * `PUT /users/:id/role`
+  * `PUT /users/:id/profile`
+* Deploy backend to Render
+
+### ✅ Deliverables:
+
+* Backend running on Render
+* Auth + user profile system complete
+
+---
+
+## 🛠️ **Day 2: Job Post + Editor Application System + Notifications**
+
+🧱 **Goal**: Clients post jobs, editors apply, and clients select editors. Notify editors when chosen.
+
+### 📌 Tasks:
+
+* `Job` model:
+
+  * `title`, `description`, `initialFiles`, `status`, `clientId`, `editorId`
+* `JobApplication` model:
+
+  * `jobId`, `editorId`, `message`, `createdAt`
+* Routes:
+
+  * `POST /jobs` — client creates job
+  * `GET /jobs` — editors browse jobs
+  * `POST /jobs/:id/apply` — editors apply
+  * `GET /jobs/:id/applications` — client views applicants
+  * `PUT /jobs/:id/assign` — client selects editor
+* Add notification:
+
+  * `job_assigned` → notify selected editor
+
+### ✅ Deliverables:
+
+* Application system finished
+* Notifications for assigned jobs working
+
+---
+
+## 💾 **Day 3: Messaging + File Uploads + Stripe Payment + Notifications**
+
+🧱 **Goal**: Build message system, handle file uploads, and Stripe payments.
+
+### 📌 Tasks:
+
+* `Message` model + Socket.io
+
+  * `GET /messages/:jobId`
+  * `POST /messages`
+* Setup file upload (Supabase or Cloudinary)
+
+  * Initial upload (client)
+  * Final delivery (editor)
+* Stripe integration:
+
+  * `POST /payments/checkout`
+  * Stripe webhook to confirm payment
+* Notifications:
+
+  * `job_submitted`, `job_approved`, `payment_received`
+  * `new_message` real-time
+
+### ✅ Deliverables:
+
+* Messaging, file upload, payment working
+* Realtime + persistent notifications complete
+
+---
+
+## 🎨 **Day 4: Frontend Setup + Auth + Dashboards**
+
+🧱 **Goal**: Build frontend auth flow, user dashboard, and role selection.
+
+### 📌 Tasks:
+
+* Init React app (Vite)
+* Setup Supabase client SDK
+* Pages:
+
+  * Login / Register
+  * Role selection (client/editor)
+  * Profile edit
+  * Dashboard shell
+* Connect APIs:
+
+  * `GET /me`
+  * `PUT /users/:id/profile`
+
+### ✅ Deliverables:
+
+* Working auth and dashboard routing
+* Role-based layout ready
+
+---
+
+## 📋 **Day 5: Job Flow UI + Messaging UI**
+
+🧱 **Goal**: Clients post jobs, editors apply, clients select, and chat works.
+
+### 📌 Tasks:
+
+* Client views:
+
+  * Post job form + file upload
+  * View job applications
+  * Select editor
+* Editor views:
+
+  * Browse jobs
+  * Apply with message
+* Chat view (Socket.io)
+* Show notifications (popup or badge)
+
+### ✅ Deliverables:
+
+* Job posting to selection flow complete
+* Chat and notifications working
+
+---
+
+## 🧪 **Day 6: Review Flow + Payments + Final Polish**
+
+🧱 **Goal**: Add job approval flow, payment screen, and polish the UI.
+
+### 📌 Tasks:
+
+* Client reviews submitted files:
+
+  * Approve / Reject job
+* Trigger Stripe payment
+* Stripe success/fail page
+* Responsive design
+* Final testing
+* Deploy frontend to Vercel
+
+### ✅ Deliverables:
+
+* Finalized job lifecycle (post → complete → paid)
+* Deployed full app (backend on Render, frontend on Vercel)
+
+---
+
+## 🔔 Bonus: Notification API Overview
+
+| Route                               | Description        |
+| ----------------------------------- | ------------------ |
+| `GET /notifications`                | List all for user  |
+| `PUT /notifications/:id/read`       | Mark as read       |
+| Socket.io Event: `new_notification` | Real-time delivery |
+
+---
+
+Would you like a downloadable version (PDF or Notion-style) of this roadmap to use as a dev checklist?
