@@ -7,6 +7,7 @@ require('dotenv').config();
 
 // Import routes
 const userRoutes = require('./routes/userRoutes');
+const jobRoutes = require('./routes/jobRoutes');
 
 // Initialize express app
 const app = express();
@@ -19,6 +20,7 @@ app.use(morgan('dev'));
 
 // Routes
 app.use('/api/users', userRoutes);
+app.use('/api/jobs', jobRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {

@@ -1,4 +1,5 @@
 const { createClient } = require('@supabase/supabase-js');
+const User = require('../models/userModel');
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -6,14 +7,19 @@ const supabase = createClient(
   process.env.SUPABASE_KEY
 );
 
-const User = require('../models/userModel');
-
-// Middleware to verify JWT token from Supabase
 const verifyToken = async (req, res, next) => {
   try {
-    // Get token from Authorization header
+    // Development testing bypass
+    if (process.env.NODE_ENV === 'development' && req.headers['x-test-user-id']) {
+      const testUser = await User.findById(req.headers['x-test-user-id']);
+      if (testUser) {
+        req.user = testUser;
+        return next();
+      }
+    }
+
+    // Regular Supabase auth for production
     const authHeader = req.headers.authorization;
-    
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({ message: 'No token provided' });
     }
