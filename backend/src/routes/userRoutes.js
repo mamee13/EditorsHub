@@ -1,21 +1,16 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/userModel');
-const { verifyToken } = require('../middleware/authMiddleware');
-const { createClient } = require('@supabase/supabase-js');
+const { verifyToken, generateToken } = require('../middleware/authMiddleware');
+const { uploadFile, deleteFile } = require('../config/cloudinary');
+const { upload } = require('../middleware/uploadMiddleware');
 
-// Initialize Supabase client
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_KEY
-);
-
-// Create or update user after Supabase auth
+// Register new user
 router.post('/register', async (req, res) => {
   try {
-    const { supabaseId, email, role, profile } = req.body;
+    const { email, password, role, profile } = req.body;
     
-    if (!supabaseId || !email || !role) {
+    if (!email || !password || !role) {
       return res.status(400).json({ message: 'Missing required fields' });
     }
     
@@ -27,28 +22,71 @@ router.post('/register', async (req, res) => {
     }
     
     // Check if user already exists
-    let user = await User.findOne({ supabaseId });
+    let user = await User.findOne({ email });
     
     if (user) {
-      // Update existing user
-      user.email = email;
-      user.role = role;
-      user.profile = profile;
-      await user.save();
-    } else {
-      // Create new user
-      user = await User.create({
-        supabaseId,
-        email,
-        role,
-        profile
-      });
+      return res.status(400).json({ message: 'User already exists' });
     }
+
+    // Create new user
+    user = await User.create({
+      email,
+      password,
+      role,
+      profile
+    });
     
-    res.status(201).json(user);
+    // Generate JWT token
+    const token = generateToken(user._id);
+    
+    // Remove password from response
+    const userResponse = user.toObject();
+    delete userResponse.password;
+    
+    res.status(201).json({
+      user: userResponse,
+      token
+    });
   } catch (error) {
     console.error('User registration error:', error);
     res.status(500).json({ message: 'Server error during registration' });
+  }
+});
+
+// Login user
+router.post('/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required' });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Verify password
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    // Generate JWT token
+    const token = generateToken(user._id);
+    
+    // Remove password from response
+    const userResponse = user.toObject();
+    delete userResponse.password;
+    
+    res.status(200).json({
+      user: userResponse,
+      token
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ message: 'Server error during login' });
   }
 });
 
@@ -94,13 +132,24 @@ router.put('/:id/role', verifyToken, async (req, res) => {
 });
 
 // Update user profile (PUT /users/:id/profile)
-router.put('/:id/profile', verifyToken, async (req, res) => {
+// Update the profile route to handle avatar upload
+router.put('/:id/profile', verifyToken, upload.single('avatar'), async (req, res) => {
   try {
-    const { name, bio, avatar, portfolio } = req.body;
+    const { name, bio, portfolio } = req.body;
     
     // Only allow users to update their own profile
     if (req.user._id.toString() !== req.params.id) {
       return res.status(403).json({ message: 'Not authorized to update this profile' });
+    }
+
+    let avatarUrl = req.user.profile.avatar;
+    
+    // Handle avatar upload if file is provided
+    if (req.file) {
+      const b64 = Buffer.from(req.file.buffer).toString('base64');
+      const dataURI = `data:${req.file.mimetype};base64,${b64}`;
+      const result = await uploadFile(dataURI);
+      avatarUrl = result.url;
     }
     
     const updatedUser = await User.findByIdAndUpdate(
@@ -109,7 +158,7 @@ router.put('/:id/profile', verifyToken, async (req, res) => {
         profile: {
           name: name || req.user.profile.name,
           bio: bio || req.user.profile.bio,
-          avatar: avatar || req.user.profile.avatar,
+          avatar: avatarUrl,
           portfolio: portfolio || req.user.profile.portfolio,
         },
       },

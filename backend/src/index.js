@@ -3,14 +3,41 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const http = require('http');
+const socketIo = require('socket.io');
+
 require('dotenv').config();
 
 // Import routes
 const userRoutes = require('./routes/userRoutes');
 const jobRoutes = require('./routes/jobRoutes');
+const messageRoutes = require('./routes/messageRoutes'); // Add this line
 
 // Initialize express app
 const app = express();
+const server = http.createServer(app);
+const io = socketIo(server, {
+  cors: {
+    origin: process.env.FRONTEND_URL,
+    methods: ['GET', 'POST']
+  }
+});
+
+// Store io instance
+app.set('io', io);
+
+// Socket.IO connection handling
+io.on('connection', (socket) => {
+  console.log('Client connected');
+
+  socket.on('join_room', (jobId) => {
+    socket.join(jobId);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('Client disconnected');
+  });
+});
 
 // Middleware
 app.use(express.json());
@@ -21,6 +48,7 @@ app.use(morgan('dev'));
 // Routes
 app.use('/api/users', userRoutes);
 app.use('/api/jobs', jobRoutes);
+app.use('/api/messages', messageRoutes); // Add this line
 
 // Health check route
 app.get('/api/health', (req, res) => {
@@ -28,13 +56,14 @@ app.get('/api/health', (req, res) => {
 });
 
 // Connect to MongoDB
+// Update your server start to use the http server
 mongoose
   .connect(process.env.MONGODB_URI)
   .then(() => {
     console.log('Connected to MongoDB');
     // Start server
     const PORT = process.env.PORT || 5000;
-    app.listen(PORT, () => {
+    server.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });
   })

@@ -4,6 +4,9 @@ const { verifyToken } = require('../middleware/authMiddleware');
 const Job = require('../models/jobModel');
 const JobApplication = require('../models/jobApplicationModel');
 const Notification = require('../models/notificationModel');
+const User = require('../models/userModel');
+const { uploadFile, deleteFile } = require('../config/cloudinary');
+const { upload } = require('../middleware/uploadMiddleware');
 
 // Create a new job (Client only)
 router.post('/', verifyToken, async (req, res) => {
@@ -12,10 +15,21 @@ router.post('/', verifyToken, async (req, res) => {
       return res.status(403).json({ message: 'Only clients can create jobs' });
     }
 
+    const uploadedFiles = [];
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        const b64 = Buffer.from(file.buffer).toString('base64');
+        const dataURI = `data:${file.mimetype};base64,${b64}`;
+        const result = await uploadFile(dataURI);
+        uploadedFiles.push(result.url);
+      }
+    }
+
     const job = await Job.create({
       ...req.body,
       clientId: req.user._id,
-      status: 'open'
+      status: 'open',
+      initialFiles: uploadedFiles
     });
 
     res.status(201).json(job);

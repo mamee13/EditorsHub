@@ -1,11 +1,5 @@
-const { createClient } = require('@supabase/supabase-js');
+const jwt = require('jsonwebtoken');
 const User = require('../models/userModel');
-
-// Initialize Supabase client
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_KEY
-);
 
 const verifyToken = async (req, res, next) => {
   try {
@@ -18,7 +12,6 @@ const verifyToken = async (req, res, next) => {
       }
     }
 
-    // Regular Supabase auth for production
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({ message: 'No token provided' });
@@ -26,31 +19,34 @@ const verifyToken = async (req, res, next) => {
     
     const token = authHeader.split(' ')[1];
     
-    // Verify token with Supabase
-    const { data, error } = await supabase.auth.getUser(token);
-    
-    if (error) {
-      return res.status(401).json({ message: 'Invalid or expired token' });
-    }
+    // Verify JWT token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
     // Get user from database
-    const user = await User.findOne({ supabaseId: data.user.id });
+    const user = await User.findById(decoded.userId);
     
-    // If user doesn't exist in our database yet, create a new one
     if (!user) {
-      return res.status(404).json({ 
-        message: 'User not found in database',
-        supabaseUser: data.user
-      });
+      return res.status(404).json({ message: 'User not found' });
     }
     
     // Attach user to request object
     req.user = user;
     next();
   } catch (error) {
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ message: 'Invalid token' });
+    }
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ message: 'Token expired' });
+    }
     console.error('Auth middleware error:', error);
     res.status(500).json({ message: 'Server error during authentication' });
   }
 };
 
-module.exports = { verifyToken };
+// Helper function to generate tokens (useful for testing)
+const generateToken = (userId) => {
+  return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '24h' });
+};
+
+module.exports = { verifyToken, generateToken };
