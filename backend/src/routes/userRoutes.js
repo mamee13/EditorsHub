@@ -1,82 +1,100 @@
 const express = require('express');
 const router = express.Router();
+const crypto = require('crypto');  // Add this line
 const User = require('../models/userModel');
 const { verifyToken, generateToken } = require('../middleware/authMiddleware');
 const { uploadFile, deleteFile } = require('../config/cloudinary');
 const { upload } = require('../middleware/uploadMiddleware');
+const AppError = require('../utils/AppError');
+const { sendVerificationEmail, sendPasswordResetEmail } = require('../utils/emailService');
 
 // Register new user
-router.post('/register', async (req, res) => {
+router.post('/register', async (req, res, next) => {
   try {
-    const { email, password, role, profile } = req.body;
+    const { email, password, passwordConfirm, role, profile } = req.body;
     
-    if (!email || !password || !role) {
-      return res.status(400).json({ message: 'Missing required fields' });
-    }
-    
-    // Check if profile information is complete
-    if (!profile || !profile.name || !profile.bio || !profile.avatar || !profile.portfolio) {
-      return res.status(400).json({ 
-        message: 'Complete profile information is required (name, bio, avatar, portfolio)' 
-      });
-    }
-    
-    // Check if user already exists
-    let user = await User.findOne({ email });
-    
-    if (user) {
-      return res.status(400).json({ message: 'User already exists' });
+    if (!email || !password || !passwordConfirm || !role) {
+      throw new AppError('Missing required fields', 400);
     }
 
-    // Create new user
+    if (password !== passwordConfirm) {
+      throw new AppError('Passwords do not match', 400);
+    }
+    
+    if (!profile || !profile.name || !profile.bio || !profile.avatar || !profile.portfolio) {
+      throw new AppError('Complete profile information is required (name, bio, avatar, portfolio)', 400);
+    }
+    
+    let user = await User.findOne({ email });
+    if (user) {
+      throw new AppError('User already exists', 400);
+    }
+
     user = await User.create({
       email,
       password,
+      passwordConfirm,
       role,
-      profile
+      profile,
+      isActive: false
     });
+
+    try {
+      // Generate verification token and send email
+      const verificationToken = user.createEmailVerificationToken();
+      await user.save({ validateBeforeSave: false });
+      
+      await sendVerificationEmail(user.email, verificationToken);
+    } catch (emailError) {
+      // If email fails, revert the user to active state
+      user.emailVerificationToken = undefined;
+      user.emailVerificationExpires = undefined;
+      user.isActive = true;
+      await user.save({ validateBeforeSave: false });
+      
+      console.error('Email error:', emailError);
+      // Continue with registration but notify about email issue
+    }
     
-    // Generate JWT token
     const token = generateToken(user._id);
-    
-    // Remove password from response
     const userResponse = user.toObject();
     delete userResponse.password;
+    delete userResponse.passwordConfirm;
     
     res.status(201).json({
       user: userResponse,
-      token
+      token,
+      message: 'Registration successful. If you did not receive a verification email, please contact support.'
     });
   } catch (error) {
-    console.error('User registration error:', error);
-    res.status(500).json({ message: 'Server error during registration' });
+    if (error instanceof AppError) {
+      return res.status(error.statusCode).json({ message: error.message });
+    }
+    console.error('Registration error:', error);
+    next(new AppError('Server error during registration', 500));
   }
 });
 
 // Login user
-router.post('/login', async (req, res) => {
+router.post('/login', async (req, res, next) => {
   try {
     const { email, password } = req.body;
     
     if (!email || !password) {
-      return res.status(400).json({ message: 'Email and password are required' });
+      throw new AppError('Email and password are required', 400);
     }
 
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      throw new AppError('User not found', 404);
     }
 
-    // Verify password
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-      return res.status(401).json({ message: 'Invalid credentials' });
+      throw new AppError('Invalid credentials', 401);
     }
 
-    // Generate JWT token
     const token = generateToken(user._id);
-    
-    // Remove password from response
     const userResponse = user.toObject();
     delete userResponse.password;
     
@@ -85,33 +103,33 @@ router.post('/login', async (req, res) => {
       token
     });
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ message: 'Server error during login' });
+    if (error instanceof AppError) {
+      return res.status(error.statusCode).json({ message: error.message });
+    }
+    next(new AppError('Server error during login', 500));
   }
 });
 
-// Get current user (GET /me)
-router.get('/me', verifyToken, async (req, res) => {
+// Get current user
+router.get('/me', verifyToken, async (req, res, next) => {
   try {
     res.status(200).json(req.user);
   } catch (error) {
-    console.error('Get user error:', error);
-    res.status(500).json({ message: 'Server error' });
+    next(new AppError('Server error', 500));
   }
 });
 
-// Update user role (PUT /users/:id/role)
-router.put('/:id/role', verifyToken, async (req, res) => {
+// Update user role
+router.put('/:id/role', verifyToken, async (req, res, next) => {
   try {
     const { role } = req.body;
     
     if (!role || !['client', 'editor'].includes(role)) {
-      return res.status(400).json({ message: 'Invalid role' });
+      throw new AppError('Invalid role', 400);
     }
     
-    // Only allow users to update their own role
     if (req.user._id.toString() !== req.params.id) {
-      return res.status(403).json({ message: 'Not authorized to update this user' });
+      throw new AppError('Not authorized to update this user', 403);
     }
     
     const updatedUser = await User.findByIdAndUpdate(
@@ -121,30 +139,29 @@ router.put('/:id/role', verifyToken, async (req, res) => {
     );
     
     if (!updatedUser) {
-      return res.status(404).json({ message: 'User not found' });
+      throw new AppError('User not found', 404);
     }
     
     res.status(200).json(updatedUser);
   } catch (error) {
-    console.error('Update role error:', error);
-    res.status(500).json({ message: 'Server error' });
+    if (error instanceof AppError) {
+      return res.status(error.statusCode).json({ message: error.message });
+    }
+    next(new AppError('Server error during role update', 500));
   }
 });
 
-// Update user profile (PUT /users/:id/profile)
-// Update the profile route to handle avatar upload
-router.put('/:id/profile', verifyToken, upload.single('avatar'), async (req, res) => {
+// Update user profile
+router.put('/:id/profile', verifyToken, upload.single('avatar'), async (req, res, next) => {
   try {
     const { name, bio, portfolio } = req.body;
     
-    // Only allow users to update their own profile
     if (req.user._id.toString() !== req.params.id) {
-      return res.status(403).json({ message: 'Not authorized to update this profile' });
+      throw new AppError('Not authorized to update this profile', 403);
     }
 
     let avatarUrl = req.user.profile.avatar;
     
-    // Handle avatar upload if file is provided
     if (req.file) {
       const b64 = Buffer.from(req.file.buffer).toString('base64');
       const dataURI = `data:${req.file.mimetype};base64,${b64}`;
@@ -166,13 +183,148 @@ router.put('/:id/profile', verifyToken, upload.single('avatar'), async (req, res
     );
     
     if (!updatedUser) {
-      return res.status(404).json({ message: 'User not found' });
+      throw new AppError('User not found', 404);
     }
     
     res.status(200).json(updatedUser);
   } catch (error) {
-    console.error('Update profile error:', error);
-    res.status(500).json({ message: 'Server error' });
+    if (error instanceof AppError) {
+      return res.status(error.statusCode).json({ message: error.message });
+    }
+    next(new AppError('Server error during profile update', 500));
+  }
+});
+
+// Update password
+router.put('/:id/password', verifyToken, async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword, passwordConfirm } = req.body;
+
+    // Check if user is authorized (using MongoDB's equals method)
+    if (!req.user._id.equals(req.params.id)) {
+      throw new AppError('Not authorized to update this user\'s password', 403);
+    }
+
+    // Validate input
+    if (!currentPassword || !newPassword || !passwordConfirm) {
+      throw new AppError('Please provide current password, new password and password confirmation', 400);
+    }
+
+    // Check if new password and confirm match
+    if (newPassword !== passwordConfirm) {
+      throw new AppError('New password and confirmation do not match', 400);
+    }
+
+    // Get user with password
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+
+    // Verify current password
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) {
+      throw new AppError('Current password is incorrect', 401);
+    }
+
+    // Update password
+    user.password = newPassword;
+    user.passwordConfirm = passwordConfirm;
+    await user.save();
+
+    res.status(200).json({ message: 'Password updated successfully' });
+  } catch (error) {
+    if (error instanceof AppError) {
+      return res.status(error.statusCode).json({ message: error.message });
+    }
+    next(new AppError('Server error during password update', 500));
+  }
+});
+
+// Verify email
+router.get('/verify-email/:token', async (req, res, next) => {
+  try {
+    const hashedToken = crypto
+      .createHash('sha256')
+      .update(req.params.token)
+      .digest('hex');
+
+    const user = await User.findOne({
+      emailVerificationToken: hashedToken,
+      emailVerificationExpires: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      throw new AppError('Invalid or expired verification token', 400);
+    }
+
+    user.isActive = true;
+    user.emailVerificationToken = undefined;
+    user.emailVerificationExpires = undefined;
+    await user.save({ validateBeforeSave: false });
+
+    res.status(200).json({ message: 'Email verified successfully' });
+  } catch (error) {
+    if (error instanceof AppError) {
+      return res.status(error.statusCode).json({ message: error.message });
+    }
+    next(new AppError('Error verifying email', 500));
+  }
+});
+
+// Forgot password
+router.post('/forgot-password', async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      throw new AppError('No user found with this email address', 404);
+    }
+
+    const resetToken = user.createPasswordResetToken();
+    await user.save({ validateBeforeSave: false });
+
+    await sendPasswordResetEmail(user.email, resetToken);
+
+    res.status(200).json({ message: 'Password reset email sent' });
+  } catch (error) {
+    if (error instanceof AppError) {
+      return res.status(error.statusCode).json({ message: error.message });
+    }
+    next(new AppError('Error sending password reset email', 500));
+  }
+});
+
+// Reset password
+router.post('/reset-password/:token', async (req, res, next) => {
+  try {
+    const hashedToken = crypto
+      .createHash('sha256')
+      .update(req.params.token)
+      .digest('hex');
+
+    const user = await User.findOne({
+      passwordResetToken: hashedToken,
+      passwordResetExpires: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      throw new AppError('Invalid or expired reset token', 400);
+    }
+
+    user.password = req.body.password;
+    user.passwordConfirm = req.body.passwordConfirm;
+    user.passwordResetToken = undefined;
+    user.passwordResetExpires = undefined;
+    await user.save();
+
+    res.status(200).json({ message: 'Password reset successfully' });
+  } catch (error) {
+    if (error instanceof AppError) {
+      return res.status(error.statusCode).json({ message: error.message });
+    }
+    next(new AppError('Error resetting password', 500));
   }
 });
 

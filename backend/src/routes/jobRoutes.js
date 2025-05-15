@@ -4,15 +4,16 @@ const { verifyToken } = require('../middleware/authMiddleware');
 const Job = require('../models/jobModel');
 const JobApplication = require('../models/jobApplicationModel');
 const Notification = require('../models/notificationModel');
-const User = require('../models/userModel');
+// const User = require('../models/userModel');
 const { uploadFile, deleteFile } = require('../config/cloudinary');
 const { upload } = require('../middleware/uploadMiddleware');
+const AppError = require('../utils/AppError');
 
 // Create a new job (Client only)
-router.post('/', verifyToken, async (req, res) => {
+router.post('/', verifyToken, upload.array('files', 5), async (req, res, next) => {
   try {
     if (req.user.role !== 'client') {
-      return res.status(403).json({ message: 'Only clients can create jobs' });
+      throw new AppError('Only clients can create jobs', 403);
     }
 
     const uploadedFiles = [];
@@ -34,18 +35,19 @@ router.post('/', verifyToken, async (req, res) => {
 
     res.status(201).json(job);
   } catch (error) {
-    console.error('Create job error:', error);
-    res.status(500).json({ message: 'Error creating job' });
+    if (error instanceof AppError) {
+      return res.status(error.statusCode).json({ message: error.message });
+    }
+    next(new AppError('Error creating job', 500));
   }
 });
 
 // Get all jobs (with filters)
-router.get('/', verifyToken, async (req, res) => {
+router.get('/', verifyToken, async (req, res, next) => {
   try {
     const { status } = req.query;
     const filter = status ? { status } : {};
     
-    // Editors see all open jobs, clients see only their jobs
     if (req.user.role === 'client') {
       filter.clientId = req.user._id;
     } else if (req.user.role === 'editor') {
@@ -58,21 +60,20 @@ router.get('/', verifyToken, async (req, res) => {
     
     res.status(200).json(jobs);
   } catch (error) {
-    console.error('Get jobs error:', error);
-    res.status(500).json({ message: 'Error fetching jobs' });
+    next(new AppError('Error fetching jobs', 500));
   }
 });
 
 // Apply for a job (Editor only)
-router.post('/:id/apply', verifyToken, async (req, res) => {
+router.post('/:id/apply', verifyToken, async (req, res, next) => {
   try {
     if (req.user.role !== 'editor') {
-      return res.status(403).json({ message: 'Only editors can apply for jobs' });
+      throw new AppError('Only editors can apply for jobs', 403);
     }
 
     const job = await Job.findById(req.params.id);
     if (!job || job.status !== 'open') {
-      return res.status(400).json({ message: 'Job not available' });
+      throw new AppError('Job not available', 400);
     }
 
     const application = await JobApplication.create({
@@ -81,7 +82,6 @@ router.post('/:id/apply', verifyToken, async (req, res) => {
       message: req.body.message
     });
 
-    // Notify client about new application
     await Notification.create({
       userId: job.clientId,
       type: 'new_application',
@@ -91,17 +91,19 @@ router.post('/:id/apply', verifyToken, async (req, res) => {
 
     res.status(201).json(application);
   } catch (error) {
-    console.error('Apply job error:', error);
-    res.status(500).json({ message: 'Error applying for job' });
+    if (error instanceof AppError) {
+      return res.status(error.statusCode).json({ message: error.message });
+    }
+    next(new AppError('Error applying for job', 500));
   }
 });
 
 // Get job applications (Client only)
-router.get('/:id/applications', verifyToken, async (req, res) => {
+router.get('/:id/applications', verifyToken, async (req, res, next) => {
   try {
     const job = await Job.findById(req.params.id);
     if (!job || job.clientId.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: 'Not authorized' });
+      throw new AppError('Not authorized', 403);
     }
 
     const applications = await JobApplication.find({ jobId: req.params.id })
@@ -109,31 +111,31 @@ router.get('/:id/applications', verifyToken, async (req, res) => {
     
     res.status(200).json(applications);
   } catch (error) {
-    console.error('Get applications error:', error);
-    res.status(500).json({ message: 'Error fetching applications' });
+    if (error instanceof AppError) {
+      return res.status(error.statusCode).json({ message: error.message });
+    }
+    next(new AppError('Error fetching applications', 500));
   }
 });
 
 // Assign editor to job (Client only)
-router.put('/:id/assign', verifyToken, async (req, res) => {
+router.put('/:id/assign', verifyToken, async (req, res, next) => {
   try {
     const { editorId } = req.body;
     const job = await Job.findById(req.params.id);
 
     if (!job || job.clientId.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: 'Not authorized' });
+      throw new AppError('Not authorized', 403);
     }
 
     if (job.status !== 'open') {
-      return res.status(400).json({ message: 'Job is not open for assignment' });
+      throw new AppError('Job is not open for assignment', 400);
     }
 
-    // Update job status and assign editor
     job.status = 'assigned';
     job.editorId = editorId;
     await job.save();
 
-    // Update application status
     await JobApplication.updateMany(
       { jobId: job._id },
       { status: 'rejected' }
@@ -143,7 +145,6 @@ router.put('/:id/assign', verifyToken, async (req, res) => {
       { status: 'accepted' }
     );
 
-    // Create notification for assigned editor
     await Notification.create({
       userId: editorId,
       type: 'job_assigned',
@@ -153,8 +154,10 @@ router.put('/:id/assign', verifyToken, async (req, res) => {
 
     res.status(200).json(job);
   } catch (error) {
-    console.error('Assign editor error:', error);
-    res.status(500).json({ message: 'Error assigning editor' });
+    if (error instanceof AppError) {
+      return res.status(error.statusCode).json({ message: error.message });
+    }
+    next(new AppError('Error assigning editor', 500));
   }
 });
 

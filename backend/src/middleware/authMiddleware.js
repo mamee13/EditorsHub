@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/userModel');
+const AppError = require('../utils/AppError');
 
 const verifyToken = async (req, res, next) => {
   try {
@@ -14,7 +15,7 @@ const verifyToken = async (req, res, next) => {
 
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ message: 'No token provided' });
+      throw new AppError('No token provided', 401);
     }
     
     const token = authHeader.split(' ')[1];
@@ -26,25 +27,27 @@ const verifyToken = async (req, res, next) => {
     const user = await User.findById(decoded.userId);
     
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      throw new AppError('User not found', 404);
     }
     
-    // Attach user to request object
+    // Attach user and token data to request object
     req.user = user;
+    req.token = decoded;  // Add decoded token data to request
     next();
   } catch (error) {
+    if (error instanceof AppError) {
+      return res.status(error.statusCode).json({ message: error.message });
+    }
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({ message: 'Invalid token' });
     }
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({ message: 'Token expired' });
     }
-    console.error('Auth middleware error:', error);
-    res.status(500).json({ message: 'Server error during authentication' });
+    next(new AppError('Server error during authentication', 500));
   }
 };
 
-// Helper function to generate tokens (useful for testing)
 const generateToken = (userId) => {
   return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '24h' });
 };
