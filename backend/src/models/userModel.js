@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 
+// Update the schema
 const userSchema = new mongoose.Schema(
   {
     email: {
@@ -51,7 +52,10 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
-    emailVerificationToken: String,
+    emailVerificationCode: {
+      type: String,
+      length: 6
+    },
     emailVerificationExpires: Date,
     passwordResetToken: String,
     passwordResetExpires: Date,
@@ -61,18 +65,12 @@ const userSchema = new mongoose.Schema(
   }
 );
 
-// Generate email verification token
-userSchema.methods.createEmailVerificationToken = function() {
-  const verificationToken = crypto.randomBytes(32).toString('hex');
-  
-  this.emailVerificationToken = crypto
-    .createHash('sha256')
-    .update(verificationToken)
-    .digest('hex');
-    
-  this.emailVerificationExpires = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
-  
-  return verificationToken;
+// Replace createEmailVerificationToken with createVerificationCode
+userSchema.methods.createVerificationCode = function() {
+  const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+  this.emailVerificationCode = verificationCode;
+  this.emailVerificationExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+  return verificationCode;
 };
 
 // Generate password reset token

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');  // Add this line
-const User = require('../models/userModel');
+const User = require('../models/UserModel');
 const { verifyToken, generateToken } = require('../middleware/authMiddleware');
 const { uploadFile, deleteFile } = require('../config/cloudinary');
 const { upload } = require('../middleware/uploadMiddleware');
@@ -21,8 +21,8 @@ router.post('/register', async (req, res, next) => {
       throw new AppError('Passwords do not match', 400);
     }
     
-    if (!profile || !profile.name || !profile.bio || !profile.avatar || !profile.portfolio) {
-      throw new AppError('Complete profile information is required (name, bio, avatar, portfolio)', 400);
+    if (!profile || !profile.name) {
+      throw new AppError('Complete profile information is required (name, email, password, )', 400);
     }
     
     let user = await User.findOne({ email });
@@ -40,30 +40,28 @@ router.post('/register', async (req, res, next) => {
     });
 
     try {
-      // Generate verification token and send email
-      const verificationToken = user.createEmailVerificationToken();
+      // Generate verification code and send email
+      const verificationCode = user.createVerificationCode();
       await user.save({ validateBeforeSave: false });
       
-      await sendVerificationEmail(user.email, verificationToken);
+      await sendVerificationEmail(user.email, verificationCode);
     } catch (emailError) {
       // If email fails, revert the user to active state
-      user.emailVerificationToken = undefined;
+      user.emailVerificationCode = undefined;
       user.emailVerificationExpires = undefined;
       user.isActive = true;
       await user.save({ validateBeforeSave: false });
       
       console.error('Email error:', emailError);
-      // Continue with registration but notify about email issue
     }
     
-    const token = generateToken(user._id);
+    // const token = generateToken(user._id);
     const userResponse = user.toObject();
     delete userResponse.password;
     delete userResponse.passwordConfirm;
     
     res.status(201).json({
       user: userResponse,
-      token,
       message: 'Registration successful. If you did not receive a verification email, please contact support.'
     });
   } catch (error) {
@@ -242,28 +240,27 @@ router.put('/:id/password', verifyToken, async (req, res, next) => {
 });
 
 // Verify email
-router.get('/verify-email/:token', async (req, res, next) => {
+router.post('/verify-email', async (req, res, next) => {
   try {
-    const hashedToken = crypto
-      .createHash('sha256')
-      .update(req.params.token)
-      .digest('hex');
+    const { email, code } = req.body;
 
     const user = await User.findOne({
-      emailVerificationToken: hashedToken,
+      email,
+      emailVerificationCode: code,
       emailVerificationExpires: { $gt: Date.now() }
     });
 
     if (!user) {
-      throw new AppError('Invalid or expired verification token', 400);
+      throw new AppError('Invalid or expired verification code', 400);
     }
 
     user.isActive = true;
-    user.emailVerificationToken = undefined;
+    const token = generateToken(user._id);
+    user.emailVerificationCode = undefined;
     user.emailVerificationExpires = undefined;
     await user.save({ validateBeforeSave: false });
 
-    res.status(200).json({ message: 'Email verified successfully' });
+    res.status(200).json({ message: 'Email verified successfully', token });
   } catch (error) {
     if (error instanceof AppError) {
       return res.status(error.statusCode).json({ message: error.message });

@@ -28,6 +28,24 @@ const jobSchema = new mongoose.Schema(
     editorId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User'
+    },
+    budget: {
+      type: Number,
+      required: true
+    },
+    deadline: {
+      type: Date,
+      required: true
+    },
+    deliverySpeed: {
+      type: String,
+      enum: ['standard', 'express', 'rush'],
+      required: true
+    },
+    // Add category field
+    category: {
+      type: String,
+      required: true
     }
   },
   {

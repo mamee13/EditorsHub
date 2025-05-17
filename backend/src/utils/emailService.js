@@ -8,18 +8,16 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-exports.sendVerificationEmail = async (email, token) => {
-  const verificationUrl = `${process.env.FRONTEND_URL}/verify-email/${token}`;
-  
+exports.sendVerificationEmail = async (email, code) => {
   await transporter.sendMail({
     from: process.env.EMAIL_USERNAME,
     to: email,
     subject: 'Verify your email address',
     html: `
       <h1>Email Verification</h1>
-      <p>Please click the link below to verify your email address:</p>
-      <a href="${verificationUrl}">${verificationUrl}</a>
-      <p>This link will expire in 24 hours.</p>
+      <p>Your verification code is:</p>
+      <h2 style="font-size: 24px; padding: 10px; background-color: #f5f5f5; text-align: center;">${code}</h2>
+      <p>This code will expire in 10 minutes.</p>
     `
   });
 };

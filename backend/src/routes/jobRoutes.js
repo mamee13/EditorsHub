@@ -4,8 +4,7 @@ const { verifyToken } = require('../middleware/authMiddleware');
 const Job = require('../models/jobModel');
 const JobApplication = require('../models/jobApplicationModel');
 const Notification = require('../models/notificationModel');
-// const User = require('../models/userModel');
-const { uploadFile, deleteFile } = require('../config/cloudinary');
+const { uploadFile } = require('../config/cloudinary');
 const { upload } = require('../middleware/uploadMiddleware');
 const AppError = require('../utils/AppError');
 
@@ -30,7 +29,10 @@ router.post('/', verifyToken, upload.array('files', 5), async (req, res, next) =
       ...req.body,
       clientId: req.user._id,
       status: 'open',
-      initialFiles: uploadedFiles
+      initialFiles: uploadedFiles,
+      budget: req.body.budget,
+      deadline: req.body.deadline,
+      deliverySpeed: req.body.deliverySpeed
     });
 
     res.status(201).json(job);
@@ -158,6 +160,26 @@ router.put('/:id/assign', verifyToken, async (req, res, next) => {
       return res.status(error.statusCode).json({ message: error.message });
     }
     next(new AppError('Error assigning editor', 500));
+  }
+});
+
+// Get specific job details
+router.get('/:jobId', verifyToken, async (req, res, next) => {
+  try {
+    const job = await Job.findById(req.params.jobId)
+      .populate('clientId', 'profile.name')
+      .populate('editorId', 'profile.name');
+
+    if (!job) {
+      throw new AppError('Job not found', 404);
+    }
+
+    res.status(200).json(job);
+  } catch (error) {
+    if (error instanceof AppError) {
+      return res.status(error.statusCode).json({ message: error.message });
+    }
+    next(new AppError('Error fetching job details', 500));
   }
 });
 

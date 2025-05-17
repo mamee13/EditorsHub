@@ -41,7 +41,13 @@ io.on('connection', (socket) => {
 
 // Middleware
 app.use(express.json());
-app.use(cors());
+// Update CORS configuration with more specific options
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(helmet());
 app.use(morgan('dev'));
 
@@ -71,3 +77,20 @@ mongoose
     console.error('MongoDB connection error:', err);
     process.exit(1);
   });
+
+// Add error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(err.statusCode || 500).json({
+    status: 'error',
+    message: err.message || 'Internal server error'
+  });
+});
+
+// Add 404 handler
+app.use((req, res) => {
+  res.status(404).json({
+    status: 'error',
+    message: 'Route not found'
+  });
+});
