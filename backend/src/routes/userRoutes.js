@@ -161,10 +161,17 @@ router.put('/:id/profile', verifyToken, upload.single('avatar'), async (req, res
     let avatarUrl = req.user.profile.avatar;
     
     if (req.file) {
-      const b64 = Buffer.from(req.file.buffer).toString('base64');
-      const dataURI = `data:${req.file.mimetype};base64,${b64}`;
-      const result = await uploadFile(dataURI);
-      avatarUrl = result.url;
+      try {
+        const b64 = Buffer.from(req.file.buffer).toString('base64');
+        const dataURI = `data:${req.file.mimetype};base64,${b64}`;
+        const result = await uploadFile(dataURI);
+        avatarUrl = result.url;
+      } catch (uploadError) {
+        console.error('Upload error:', uploadError);
+        throw new AppError('Error uploading avatar', 500);
+      }
+    } else {
+      console.error('No file uploaded');
     }
     
     const updatedUser = await User.findByIdAndUpdate(
@@ -189,6 +196,7 @@ router.put('/:id/profile', verifyToken, upload.single('avatar'), async (req, res
     if (error instanceof AppError) {
       return res.status(error.statusCode).json({ message: error.message });
     }
+    console.error('Server error during profile update:', error);
     next(new AppError('Server error during profile update', 500));
   }
 });
@@ -279,39 +287,37 @@ router.post('/forgot-password', async (req, res, next) => {
       throw new AppError('No user found with this email address', 404);
     }
 
-    const resetToken = user.createPasswordResetToken();
+    const resetCode = user.createPasswordResetCode();
     await user.save({ validateBeforeSave: false });
 
-    await sendPasswordResetEmail(user.email, resetToken);
+    await sendPasswordResetEmail(user.email, resetCode);
 
-    res.status(200).json({ message: 'Password reset email sent' });
+    res.status(200).json({ message: 'Password reset code sent' });
   } catch (error) {
     if (error instanceof AppError) {
       return res.status(error.statusCode).json({ message: error.message });
     }
-    next(new AppError('Error sending password reset email', 500));
+    next(new AppError('Error sending password reset code', 500));
   }
 });
 
 // Reset password
-router.post('/reset-password/:token', async (req, res, next) => {
+router.post('/reset-password', async (req, res, next) => {
   try {
-    const hashedToken = crypto
-      .createHash('sha256')
-      .update(req.params.token)
-      .digest('hex');
+    const { email, code, password, passwordConfirm } = req.body;
 
     const user = await User.findOne({
-      passwordResetToken: hashedToken,
+      email,
+      passwordResetToken: code,
       passwordResetExpires: { $gt: Date.now() }
     });
 
     if (!user) {
-      throw new AppError('Invalid or expired reset token', 400);
+      throw new AppError('Invalid or expired reset code', 400);
     }
 
-    user.password = req.body.password;
-    user.passwordConfirm = req.body.passwordConfirm;
+    user.password = password;
+    user.passwordConfirm = passwordConfirm;
     user.passwordResetToken = undefined;
     user.passwordResetExpires = undefined;
     await user.save();

@@ -73,18 +73,12 @@ userSchema.methods.createVerificationCode = function() {
   return verificationCode;
 };
 
-// Generate password reset token
-userSchema.methods.createPasswordResetToken = function() {
-  const resetToken = crypto.randomBytes(32).toString('hex');
-  
-  this.passwordResetToken = crypto
-    .createHash('sha256')
-    .update(resetToken)
-    .digest('hex');
-    
-  this.passwordResetExpires = Date.now() + 60 * 60 * 1000; // 1 hour
-  
-  return resetToken;
+// Generate password reset code
+userSchema.methods.createPasswordResetCode = function() {
+  const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+  this.passwordResetToken = resetCode;
+  this.passwordResetExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+  return resetCode;
 };
 
 // Remove passwordConfirm field before saving

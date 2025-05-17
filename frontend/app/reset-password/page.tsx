@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Camera, Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -8,9 +9,14 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
-export default function ResetPasswordPage({ params }: { params: { token: string } }) {
+export default function ResetPasswordPage() {
+  const [code, setCode] = useState("")
+  const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+  const router = useRouter()
 
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword)
@@ -18,6 +24,30 @@ export default function ResetPasswordPage({ params }: { params: { token: string 
 
   const toggleConfirmPasswordVisibility = () => {
     setShowConfirmPassword(!showConfirmPassword)
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      const response = await fetch("http://localhost:5000/api/users/reset-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ code, password, passwordConfirm: confirmPassword }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || "Failed to reset password")
+      }
+
+      setMessage("Password reset successfully!")
+      router.push("/login") // Redirect to login page
+    } catch (error: any) {
+      console.error("Error resetting password:", error)
+      setMessage(error.message || "An error occurred while resetting password.")
+    }
   }
 
   return (
@@ -30,14 +60,32 @@ export default function ResetPasswordPage({ params }: { params: { token: string 
         <Card>
           <CardHeader className="space-y-1">
             <CardTitle className="text-2xl">Reset password</CardTitle>
-            <CardDescription>Enter your new password below</CardDescription>
+            <CardDescription>Enter your code and new password below</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">
-            <form className="grid gap-4">
+            <form className="grid gap-4" onSubmit={handleSubmit}>
+              <div className="grid gap-2">
+                <Label htmlFor="code">Verification Code</Label>
+                <Input
+                  id="code"
+                  type="text"
+                  placeholder="Enter 6-digit code"
+                  required
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                />
+              </div>
               <div className="grid gap-2">
                 <Label htmlFor="password">New Password</Label>
                 <div className="relative">
-                  <Input id="password" type={showPassword ? "text" : "password"} placeholder="••••••••" required />
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
                   <Button
                     type="button"
                     variant="ghost"
@@ -62,6 +110,8 @@ export default function ResetPasswordPage({ params }: { params: { token: string 
                     type={showConfirmPassword ? "text" : "password"}
                     placeholder="••••••••"
                     required
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
                   />
                   <Button
                     type="button"
@@ -93,6 +143,11 @@ export default function ResetPasswordPage({ params }: { params: { token: string 
             </div>
           </CardFooter>
         </Card>
+        {message && (
+          <div className={`mt-4 p-4 rounded-md ${message.includes("successfully") ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+            {message}
+          </div>
+        )}
       </div>
     </div>
   )
