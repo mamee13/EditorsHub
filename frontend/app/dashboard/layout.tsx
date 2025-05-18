@@ -1,9 +1,9 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { Dialog } from "@/components/ui/dialog"
 
 import {
@@ -31,32 +31,127 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 
+interface User {
+  name: string;
+  email: string;
+  role: "client" | "editor";
+  profile: {
+    name: string;
+    avatar: string;
+  }
+}
+
+// Add this interface near the top with other interfaces
+interface Notification {
+  _id: string;
+  type: 'job_assigned' | 'job_completed' | 'new_application';
+  message: string;
+  read: boolean;
+  createdAt: string;
+  jobId: string;
+}
+
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
   const pathname = usePathname()
+  const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [user, setUser] = useState<User | null>(null)
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [unreadCount, setUnreadCount] = useState(0)
 
-  // Mock user data
-  const user = {
-    name: "John Doe",
-    email: "john@example.com",
-    role: "client",
-    avatar: "/placeholder.svg?height=32&width=32",
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const token = localStorage.getItem('token')
+        if (!token) {
+          router.push('/login')
+          return
+        }
+
+        const response = await fetch('http://localhost:5000/api/users/me', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+
+        if (!response.ok) throw new Error('Failed to fetch user')
+        const userData = await response.json()
+        setUser(userData)
+      } catch (error) {
+        console.error('Error fetching user:', error)
+        router.push('/login')
+      }
+    }
+
+    fetchUser()
+  }, [router])
+
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        const token = localStorage.getItem('token')
+        const response = await fetch('http://localhost:5000/api/notifications', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+        if (!response.ok) throw new Error('Failed to fetch notifications')
+        const data = await response.json()
+        setNotifications(data)
+        setUnreadCount(data.filter((n: Notification) => !n.read).length)
+      } catch (error) {
+        console.error('Error fetching notifications:', error)
+      }
+    }
+
+    if (user) {
+      fetchNotifications()
+    }
+  }, [user])
+
+  const markAsRead = async (notificationId: string) => {
+    try {
+      const token = localStorage.getItem('token')
+      await fetch(`http://localhost:5000/api/notifications/${notificationId}/read`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      setNotifications(prev => 
+        prev.map(n => n._id === notificationId ? { ...n, read: true } : n)
+      )
+      setUnreadCount(prev => prev - 1)
+    } catch (error) {
+      console.error('Error marking notification as read:', error)
+    }
   }
+
+  if (!user) return null
 
   const isClient = user.role === "client"
 
+  // Remove Settings from navigation array
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: Home },
     { name: isClient ? "My Jobs" : "Available Jobs", href: "/dashboard/jobs", icon: FileText },
     { name: "Messages", href: "/dashboard/messages", icon: MessageSquare },
     { name: "Profile", href: "/dashboard/profile", icon: User },
-    { name: "Settings", href: "/dashboard/settings", icon: Settings },
   ]
-
+  
+  // Add logout handler function
+  const handleLogout = () => {
+    localStorage.removeItem('token')
+    router.push('/')
+  }
+  
   return (
     <Dialog>
       <div className="flex min-h-screen flex-col">
@@ -94,9 +189,13 @@ export default function DashboardLayout({
               </nav>
               <div className="border-t p-4">
                 <div className="flex items-center gap-3">
-                  <img src={user.avatar || "/placeholder.svg"} alt={user.name} className="h-10 w-10 rounded-full" />
+                  <img 
+                    src={user.profile.avatar || "/placeholder.svg"} 
+                    alt={user.profile.name} 
+                    className="h-10 w-10 rounded-full" 
+                  />
                   <div>
-                    <p className="font-medium">{user.name}</p>
+                    <p className="font-medium">{user.profile.name}</p>
                     <p className="text-sm text-gray-500">{user.email}</p>
                   </div>
                 </div>
@@ -150,9 +249,39 @@ export default function DashboardLayout({
               </SheetTrigger>
               <div className="flex flex-1 items-center justify-end gap-4">
                 <Button variant="ghost" size="icon" className="relative">
-                  <Bell className="h-5 w-5" />
-                  <span className="sr-only">Notifications</span>
-                  <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-red-500"></span>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="relative">
+                        <Bell className="h-5 w-5" />
+                        {unreadCount > 0 && (
+                          <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-red-500" />
+                        )}
+                        <span className="sr-only">Notifications</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-80">
+                      <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      {notifications.length === 0 ? (
+                        <div className="p-4 text-center text-sm text-gray-500">
+                          No notifications
+                        </div>
+                      ) : (
+                        notifications.map((notification) => (
+                          <DropdownMenuItem
+                            key={notification._id}
+                            className={`flex flex-col items-start gap-1 p-4 ${!notification.read ? 'bg-gray-50' : ''}`}
+                            onClick={() => markAsRead(notification._id)}
+                          >
+                            <p className="text-sm">{notification.message}</p>
+                            <p className="text-xs text-gray-500">
+                              {new Date(notification.createdAt).toLocaleDateString()}
+                            </p>
+                          </DropdownMenuItem>
+                        ))
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </Button>
                 <Button variant="ghost" size="icon">
                   <Inbox className="h-5 w-5" />
@@ -161,8 +290,8 @@ export default function DashboardLayout({
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="flex items-center gap-2">
-                      <img src={user.avatar || "/placeholder.svg"} alt={user.name} className="h-8 w-8 rounded-full" />
-                      <span className="hidden md:block">{user.name}</span>
+                      <img src={user.profile.avatar || "/placeholder.svg"} alt={user.profile.name} className="h-8 w-8 rounded-full" />
+                      <span className="hidden md:block">{user.profile.name}</span>
                       <ChevronDown className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
@@ -173,12 +302,8 @@ export default function DashboardLayout({
                       <User className="mr-2 h-4 w-4" />
                       <span>Profile</span>
                     </DropdownMenuItem>
-                    <DropdownMenuItem>
-                      <Settings className="mr-2 h-4 w-4" />
-                      <span>Settings</span>
-                    </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-red-600">
+                    <DropdownMenuItem className="text-red-600" onClick={handleLogout}>
                       <LogOut className="mr-2 h-4 w-4" />
                       <span>Log out</span>
                     </DropdownMenuItem>

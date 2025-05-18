@@ -5,6 +5,7 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const http = require('http');
 const socketIo = require('socket.io');
+const notificationRoutes = require('./routes/notificationRoutes');
 
 require('dotenv').config();
 
@@ -55,6 +56,7 @@ app.use(morgan('dev'));
 app.use('/api/users', userRoutes);
 app.use('/api/jobs', jobRoutes);
 app.use('/api/messages', messageRoutes); // Add this line
+app.use('/api/notifications', notificationRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {

@@ -100,26 +100,6 @@ router.post('/:id/apply', verifyToken, async (req, res, next) => {
   }
 });
 
-// Get job applications (Client only)
-router.get('/:id/applications', verifyToken, async (req, res, next) => {
-  try {
-    const job = await Job.findById(req.params.id);
-    if (!job || job.clientId.toString() !== req.user._id.toString()) {
-      throw new AppError('Not authorized', 403);
-    }
-
-    const applications = await JobApplication.find({ jobId: req.params.id })
-      .populate('editorId', 'profile.name profile.portfolio');
-    
-    res.status(200).json(applications);
-  } catch (error) {
-    if (error instanceof AppError) {
-      return res.status(error.statusCode).json({ message: error.message });
-    }
-    next(new AppError('Error fetching applications', 500));
-  }
-});
-
 // Assign editor to job (Client only)
 router.put('/:id/assign', verifyToken, async (req, res, next) => {
   try {
@@ -164,22 +144,116 @@ router.put('/:id/assign', verifyToken, async (req, res, next) => {
 });
 
 // Get specific job details
+// Update the job details route
+// Move these special routes BEFORE the /:jobId route
+// Add this route for job stats
+router.get('/stats', verifyToken, async (req, res, next) => {
+  try {
+    const userId = req.user._id;
+    const role = req.user.role;
+
+    let stats = {
+      activeJobs: 0,
+      completedJobs: 0,
+      totalCount: 0,
+      unreadMessages: 0
+    };
+
+    if (role === 'editor') {
+      stats.activeJobs = await Job.countDocuments({ editorId: userId, status: 'in_progress' });
+      stats.completedJobs = await Job.countDocuments({ editorId: userId, status: 'completed' });
+      stats.totalCount = await Job.countDocuments({ editorId: userId });
+    } else {
+      stats.activeJobs = await Job.countDocuments({ clientId: userId, status: 'in_progress' });
+      stats.completedJobs = await Job.countDocuments({ clientId: userId, status: 'completed' });
+      stats.totalCount = await Job.countDocuments({ clientId: userId });
+    }
+
+    stats.unreadMessages = 0;
+    res.json(stats);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Add this route to get editor's assigned jobs
+router.get('/my-assignments', verifyToken, async (req, res, next) => {
+  try {
+    if (req.user.role !== 'editor') {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const assignments = await Job.find({
+      editorId: req.user._id,
+      status: { $in: ['assigned', 'in_progress', 'review'] }
+    })
+    .populate('clientId', 'profile.name')
+    .sort({ createdAt: -1 })
+    .limit(5);
+
+    res.json(assignments);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Then keep the specific job route AFTER the special routes
+// Get specific job details
 router.get('/:jobId', verifyToken, async (req, res, next) => {
   try {
     const job = await Job.findById(req.params.jobId)
-      .populate('clientId', 'profile.name')
-      .populate('editorId', 'profile.name');
+      .populate('clientId', 'profile.name profile.avatar')
+      .populate('editorId', 'profile.name profile.avatar');
 
     if (!job) {
-      throw new AppError('Job not found', 404);
+      return res.status(404).json({ status: 'error', message: 'Job not found' });
     }
 
-    res.status(200).json(job);
-  } catch (error) {
-    if (error instanceof AppError) {
-      return res.status(error.statusCode).json({ message: error.message });
+    // If user is editor, only return necessary job details
+    if (req.user.role === 'editor') {
+      const jobDetails = {
+        _id: job._id,
+        title: job.title,
+        description: job.description,
+        status: job.status,
+        deadline: job.deadline,
+        budget: job.budget,
+        deliverySpeed: job.deliverySpeed,
+        initialFiles: job.initialFiles,
+        client: job.clientId ? {
+          name: job.clientId.profile.name,
+          avatar: job.clientId.profile.avatar
+        } : null
+      };
+      return res.json(jobDetails);
     }
-    next(new AppError('Error fetching job details', 500));
+
+    // If user is client or admin, return full job details
+    res.json(job);
+  } catch (error) {
+    console.error('Error fetching job:', error);
+    res.status(500).json({ status: 'error', message: 'Error fetching job details' });
+  }
+});
+
+// Get job applications (Client only)
+router.get('/:jobId/applications', verifyToken, async (req, res, next) => {
+  try {
+    const job = await Job.findById(req.params.jobId);
+    if (!job || job.clientId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ 
+        status: 'error', 
+        message: 'Access denied' 
+      });
+    }
+
+    const applications = await JobApplication.find({ jobId: req.params.jobId })
+      .populate('editorId', 'profile.name profile.avatar')
+      .sort({ createdAt: -1 });
+
+    res.json(applications);
+  } catch (error) {
+    next(new AppError('Error fetching applications', 500));
   }
 });
 

@@ -1,78 +1,73 @@
+"use client"
+
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Search } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { useRouter } from "next/navigation"
 
 export default function MessagesPage() {
-  // Mock user data - in a real app, this would come from an API
-  const user = {
-    role: "client", // or "editor"
-  }
+  const router = useRouter()
+  // Update the user state type
+  const [user, setUser] = useState<{ role: string; profile: { name: string } } | null>(null)
+  const [conversations, setConversations] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchUserAndConversations = async () => {
+      try {
+        const token = localStorage.getItem("token")
+        if (!token) {
+          router.push("/login")
+          return
+        }
+
+        // Fetch user data
+        const userResponse = await fetch("http://localhost:5000/api/users/me", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+        if (!userResponse.ok) throw new Error("Failed to fetch user")
+        const userData = await userResponse.json()
+        setUser(userData)
+
+        // Fetch conversations based on user role
+        const endpoint = userData.role === 'editor' 
+          ? "http://localhost:5000/api/jobs/my-assignments"  // Use my-assignments for editors
+          : "http://localhost:5000/api/jobs"                 // Use regular jobs endpoint for clients
+
+        const conversationsResponse = await fetch(endpoint, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+        if (!conversationsResponse.ok) throw new Error("Failed to fetch conversations")
+        const jobsData = await conversationsResponse.json()
+        
+        // Filter out jobs without messages or unassigned jobs for both editors and clients
+        const filteredJobs = userData.role === 'editor'
+          ? jobsData.filter((job: { status: string }) => job.status !== 'open')
+          : jobsData.filter((job: { status: string; editorId: any }) => 
+              job.status === 'assigned' || job.status === 'in_progress' || job.status === 'completed'
+            )
+
+        setConversations(filteredJobs)
+      } catch (error) {
+        console.error("Error:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchUserAndConversations()
+  }, [router])
+
+  if (loading) return <div>Loading...</div>
+  if (!user) return null
 
   const isClient = user.role === "client"
-
-  // Mock conversations data
-  const conversations = [
-    {
-      id: "conv-1",
-      jobId: "job-1",
-      jobTitle: "Wedding Photo Editing",
-      lastMessage:
-        "Hi there! I've completed the first batch of edits for the wedding photos. Could you take a look and let me know your thoughts?",
-      timestamp: "2h ago",
-      unread: true,
-      with: isClient
-        ? {
-            name: "Jane Smith",
-            avatar: "/placeholder.svg?height=40&width=40",
-            role: "editor",
-          }
-        : {
-            name: "Robert Brown",
-            avatar: "/placeholder.svg?height=40&width=40",
-            role: "client",
-          },
-    },
-    {
-      id: "conv-2",
-      jobId: "job-3",
-      jobTitle: "Real Estate Photo Enhancement",
-      lastMessage:
-        "Just wanted to check in about the timeline for the project. Are we still on track for delivery by the end of the week?",
-      timestamp: "1d ago",
-      unread: true,
-      with: isClient
-        ? {
-            name: "Mike Johnson",
-            avatar: "/placeholder.svg?height=40&width=40",
-            role: "editor",
-          }
-        : {
-            name: "David Wilson",
-            avatar: "/placeholder.svg?height=40&width=40",
-            role: "client",
-          },
-    },
-    {
-      id: "conv-3",
-      jobId: "job-4",
-      jobTitle: "Corporate Video Editing",
-      lastMessage: "The final video looks great! Thank you for your work on this project.",
-      timestamp: "3d ago",
-      unread: false,
-      with: isClient
-        ? {
-            name: "Sarah Williams",
-            avatar: "/placeholder.svg?height=40&width=40",
-            role: "editor",
-          }
-        : {
-            name: "Global Corp",
-            avatar: "/placeholder.svg?height=40&width=40",
-            role: "client",
-          },
-    },
-  ]
 
   return (
     <div className="container py-8">
@@ -98,25 +93,27 @@ export default function MessagesPage() {
         <CardContent>
           <div className="space-y-4">
             {conversations.map((conversation) => (
-              <Link key={conversation.id} href={`/dashboard/messages/${conversation.jobId}`}>
-                <div
-                  className={`flex cursor-pointer gap-4 rounded-lg border p-4 transition-colors hover:bg-muted/50 ${conversation.unread ? "bg-muted/20" : ""}`}
-                >
+              <Link key={conversation._id} href={`/dashboard/messages/${conversation._id}`}>
+                <div className="flex cursor-pointer gap-4 rounded-lg border p-4 transition-colors hover:bg-muted/50">
                   <img
-                    src={conversation.with.avatar || "/placeholder.svg"}
-                    alt={`${conversation.with.name}'s avatar`}
+                    src={isClient 
+                      ? conversation.editorId?.profile?.avatar || "/placeholder.svg"
+                      : conversation.clientId?.profile?.avatar || "/placeholder.svg"
+                    }
+                    alt="Avatar"
                     className="h-12 w-12 rounded-full"
                   />
                   <div className="flex-1 space-y-1">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-medium">{conversation.with.name}</h3>
-                        {conversation.unread && <span className="rounded-full bg-indigo-600 h-2 w-2"></span>}
-                      </div>
-                      <span className="text-xs text-muted-foreground">{conversation.timestamp}</span>
+                      <h3 className="font-medium">
+                        {isClient 
+                          ? conversation.editorId?.profile?.name || "Unassigned"
+                          : conversation.clientId?.profile?.name
+                        }
+                      </h3>
                     </div>
-                    <p className="text-sm font-medium">{conversation.jobTitle}</p>
-                    <p className="line-clamp-1 text-sm text-muted-foreground">{conversation.lastMessage}</p>
+                    <p className="text-sm font-medium">{conversation.title}</p>
+                    <p className="text-sm text-muted-foreground">Status: {conversation.status}</p>
                   </div>
                 </div>
               </Link>

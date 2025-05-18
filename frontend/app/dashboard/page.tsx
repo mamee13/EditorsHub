@@ -17,24 +17,33 @@ import {
 
 // Add these types at the top of the file
 interface ClientJob {
-  id: string;
+  _id: string;
   title: string;
   status: string;
   deadline: string;
-  editor: string | null;
+  editorId: {
+    profile: {
+      name: string;
+    }
+  } | null;
 }
 
 interface EditorJob {
-  id: string;
+  _id: string;
   title: string;
   status: string;
   deadline: string;
-  client: string;
+  clientId: {
+    profile: {
+      name: string;
+    }
+  };
 }
 
 // Add this type guard function after the interfaces
+// Update the type guard
 function isClientJob(job: ClientJob | EditorJob): job is ClientJob {
-  return 'editor' in job;
+  return 'editorId' in job;
 }
 
 interface User {
@@ -53,6 +62,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState<any>(null)
   const [recentJobs, setRecentJobs] = useState<(ClientJob | EditorJob)[]>([])
+  const [recentMessages, setRecentMessages] = useState<any[]>([]) // Add this line
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -77,7 +87,7 @@ export default function DashboardPage() {
           setUser(userData)
 
           // Fetch stats
-          const statsResponse = await fetch('http://localhost:5000/api/jobs', {
+          const statsResponse = await fetch('http://localhost:5000/api/jobs/stats', {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
@@ -88,17 +98,33 @@ export default function DashboardPage() {
           const statsData = await statsResponse.json()
           setStats(statsData)
 
-          // Fetch recent jobs
-          const jobsResponse = await fetch('http://localhost:5000/api/jobs', {
+          // Fetch recent jobs - for editors, only fetch their assigned jobs
+          const jobsEndpoint = userData.role === 'editor' 
+            ? 'http://localhost:5000/api/jobs/my-assignments'
+            : 'http://localhost:5000/api/jobs'
+          
+          const jobsResponse = await fetch(jobsEndpoint, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          })
+  
+          if (!jobsResponse.ok) throw new Error('Failed to fetch jobs')
+          const jobsData = await jobsResponse.json()
+          setRecentJobs(jobsData)
+
+          // Add this after fetching jobs
+          const messagesResponse = await fetch('http://localhost:5000/api/messages/recent', {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
             }
           })
 
-          if (!jobsResponse.ok) throw new Error('Failed to fetch jobs')
-          const jobsData = await jobsResponse.json()
-          setRecentJobs(jobsData)
+          if (!messagesResponse.ok) throw new Error('Failed to fetch messages')
+          const messagesData = await messagesResponse.json()
+          setRecentMessages(messagesData)
         }
       } catch (error) {
         console.error('Error fetching dashboard data:', error)
@@ -125,7 +151,7 @@ export default function DashboardPage() {
   const displayStats = stats ? [
     { label: "Active Jobs", value: stats.activeJobs, icon: FileText },
     { label: "Completed Jobs", value: stats.completedJobs, icon: Clock },
-    { label: isClient ? "Editors Hired" : "Total Jobs", value: stats.totalCount, icon: Users },
+    { label: "Total Jobs", value: stats.totalCount, icon: Users },
     { label: "Unread Messages", value: stats.unreadMessages, icon: MessageSquare },
   ] : []
 
@@ -133,7 +159,7 @@ export default function DashboardPage() {
     <div className="container py-8">
       <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Welcome back, {user.name}</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Welcome back, {user.profile.name}</h1>
           <p className="text-muted-foreground">
             Here's what's happening with your {isClient ? "projects" : "editing jobs"} today.
           </p>
@@ -189,20 +215,20 @@ export default function DashboardPage() {
           <CardContent>
             <div className="space-y-4">
               {recentJobs.map((job) => (
-                <div key={job.id} className="flex items-center justify-between rounded-lg border p-4">
+                <div key={job._id} className="flex items-center justify-between rounded-lg border p-4">
                   <div>
                     <h3 className="font-medium">{job.title}</h3>
                     <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                       <span>Status: {job.status}</span>
-                      <span>Due: {job.deadline}</span>
+                      <span>Due: {new Date(job.deadline).toLocaleDateString()}</span>
                       {isClient ? (
-                        <span>Editor: {isClientJob(job) ? (job.editor || "Not assigned") : "N/A"}</span>
+                        <span>Editor: {isClientJob(job) ? (job.editorId?.profile.name || "Not assigned") : "N/A"}</span>
                       ) : (
-                        <span>Client: {!isClientJob(job) ? job.client : "N/A"}</span>
+                        <span>Client: {!isClientJob(job) ? job.clientId.profile.name : "N/A"}</span>
                       )}
                     </div>
                   </div>
-                  <Link href={`/dashboard/jobs/${job.id}`}>
+                  <Link href={`/dashboard/jobs/${job._id}`}>
                     <Button variant="ghost" size="icon">
                       <ArrowRight className="h-4 w-4" />
                     </Button>
@@ -227,33 +253,29 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {/* You will replace this with fetched messages later */}
-              <div className="flex items-start gap-4 rounded-lg border p-4">
-                <img src="/placeholder.svg?height=40&width=40" alt="User avatar" className="h-10 w-10 rounded-full" />
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-medium">{isClient ? "Jane Smith" : "Robert Brown"}</h3>
-                    <span className="text-xs text-muted-foreground">2h ago</span>
+              {recentMessages.map((message) => (
+                <div key={message._id} className="flex items-start gap-4 rounded-lg border p-4">
+                  <img 
+                    src={message.senderId.profile.avatar || "/placeholder.svg"} 
+                    alt="User avatar" 
+                    className="h-10 w-10 rounded-full" 
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-medium">{message.senderId.profile.name}</h3>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(message.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <p className="line-clamp-2 text-sm text-muted-foreground">
+                      {message.content}
+                    </p>
                   </div>
-                  <p className="line-clamp-2 text-sm text-muted-foreground">
-                    Hi there! I've completed the first batch of edits for the wedding photos. Could you take a look and
-                    let me know your thoughts?
-                  </p>
                 </div>
-              </div>
-              <div className="flex items-start gap-4 rounded-lg border p-4">
-                <img src="/placeholder.svg?height=40&width=40" alt="User avatar" className="h-10 w-10 rounded-full" />
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-medium">{isClient ? "Mike Johnson" : "Sarah Williams"}</h3>
-                    <span className="text-xs text-muted-foreground">1d ago</span>
-                  </div>
-                  <p className="line-clamp-2 text-sm text-muted-foreground">
-                    Just wanted to check in about the timeline for the project. Are we still on track for delivery by
-                    the end of the week?
-                  </p>
-                </div>
-              </div>
+              ))}
+              {recentMessages.length === 0 && (
+                <p className="text-center text-sm text-muted-foreground">No recent messages</p>
+              )}
             </div>
           </CardContent>
           <CardFooter>

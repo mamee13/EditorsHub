@@ -1,35 +1,33 @@
 const mongoose = require('mongoose');
 
-const messageSchema = new mongoose.Schema(
-  {
-    jobId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Job',
-      required: true
-    },
-    senderId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: true
-    },
-    content: {
-      type: String,
-      required: true
-    },
-    attachments: [{
-      url: String,
-      publicId: String,
-      type: String // 'image', 'video', 'document'
-    }],
-    isRead: {
-      type: Boolean,
-      default: false
+const attachmentSchema = new mongoose.Schema({
+  url: String,
+  publicId: String,
+  type: String
+});
+
+const messageSchema = new mongoose.Schema({
+  jobId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Job',
+    required: true
+  },
+  senderId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  content: {
+    type: String,
+    required: function() {
+      return this.attachments.length === 0; // Content is required only if there are no attachments
     }
   },
-  {
-    timestamps: true
+  attachments: [attachmentSchema],
+  createdAt: {
+    type: Date,
+    default: Date.now
   }
-);
+});
 
-const Message = mongoose.model('Message', messageSchema);
-module.exports = Message;
+module.exports = mongoose.model('Message', messageSchema);
