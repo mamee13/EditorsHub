@@ -17,7 +17,7 @@ const jobSchema = new mongoose.Schema(
     }],
     status: {
       type: String,
-      enum: ['open', 'assigned', 'in_progress', 'completed', 'cancelled'],
+      enum: ['open', 'assigned', 'in_progress', 'completed', 'cancelled', 'delivered'],
       default: 'open'
     },
     clientId: {
@@ -46,7 +46,20 @@ const jobSchema = new mongoose.Schema(
     category: {
       type: String,
       required: true
-    }
+    },
+    finalFiles: [{
+      url: String,
+      publicId: String,
+      name: String
+    }],
+    paymentStatus: {
+      type: String,
+      enum: ['pending', 'paid', 'refunded'],
+      default: 'pending'
+    },
+    paymentIntentId: {
+      type: String
+    },
   },
   {
     timestamps: true

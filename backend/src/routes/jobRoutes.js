@@ -7,6 +7,7 @@ const Notification = require('../models/notificationModel');
 const { uploadFile } = require('../config/cloudinary');
 const { upload } = require('../middleware/uploadMiddleware');
 const AppError = require('../utils/AppError');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 // Create a new job (Client only)
 router.post('/', verifyToken, upload.array('files', 5), async (req, res, next) => {
@@ -254,6 +255,144 @@ router.get('/:jobId/applications', verifyToken, async (req, res, next) => {
     res.json(applications);
   } catch (error) {
     next(new AppError('Error fetching applications', 500));
+  }
+});
+
+// Submit final files (Editor only)
+router.post('/:id/submit', verifyToken, upload.array('files', 5), async (req, res, next) => {
+  try {
+    const job = await Job.findById(req.params.id);
+    
+    if (!job || job.editorId.toString() !== req.user._id.toString()) {
+      throw new AppError('Not authorized', 403);
+    }
+
+    const uploadedFiles = [];
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        const b64 = Buffer.from(file.buffer).toString('base64');
+        const dataURI = `data:${file.mimetype};base64,${b64}`;
+        const result = await uploadFile(dataURI);
+        uploadedFiles.push({
+          url: result.url,
+          publicId: result.public_id,
+          name: file.originalname
+        });
+      }
+    }
+
+    job.finalFiles = uploadedFiles;
+    job.status = 'delivered';
+    await job.save();
+
+    // Create payment intent
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: job.budget * 100, // Stripe uses cents
+      currency: 'usd',
+      metadata: {
+        jobId: job._id.toString()
+      }
+    });
+
+    job.paymentIntentId = paymentIntent.id;
+    await job.save();
+
+    // Notify client
+    await Notification.create({
+      userId: job.clientId,
+      type: 'files_submitted',
+      message: `Final files submitted for job: ${job.title}`,
+      jobId: job._id
+    });
+
+    res.status(200).json({ message: 'Files submitted successfully' });
+  } catch (error) {
+    next(new AppError('Error submitting files', 500));
+  }
+});
+
+// Cancel job
+router.put('/:id/cancel', verifyToken, async (req, res, next) => {
+  try {
+    const job = await Job.findById(req.params.id)
+      .populate('clientId', 'profile.name')
+      .populate('editorId', 'profile.name');
+    
+    if (!job) {
+      return res.status(404).json({ message: 'Job not found' });
+    }
+
+    // Check authorization
+    const isAuthorized = 
+      job.clientId._id.toString() === req.user._id.toString() || 
+      (job.editorId && job.editorId._id.toString() === req.user._id.toString());
+
+    if (!isAuthorized) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
+    // Validate job status
+    if (!['open', 'assigned', 'in_progress'].includes(job.status)) {
+      return res.status(400).json({ message: 'Cannot cancel job in current status' });
+    }
+
+    // Update job status
+    job.status = 'cancelled';
+    await job.save();
+
+    // Create notification
+    const notifyUserId = req.user._id.toString() === job.clientId._id.toString() 
+      ? job.editorId?._id 
+      : job.clientId._id;
+
+    if (notifyUserId) {
+      await Notification.create({
+        userId: notifyUserId,
+        type: 'job_cancelled',
+        message: `Job "${job.title}" has been cancelled`,
+        jobId: job._id
+      });
+    }
+
+    return res.status(200).json({ message: 'Job cancelled successfully' });
+  } catch (error) {
+    console.error('Cancel job error:', error);
+    return res.status(500).json({ message: 'Error cancelling job' });
+  }
+});
+
+// Create payment session
+router.post('/:id/payment', verifyToken, async (req, res, next) => {
+  try {
+    const job = await Job.findById(req.params.id);
+    
+    if (!job || job.clientId.toString() !== req.user._id.toString()) {
+      throw new AppError('Not authorized', 403);
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: [{
+        price_data: {
+          currency: 'usd',
+          product_data: {
+            name: `Payment for job: ${job.title}`,
+          },
+          unit_amount: job.budget * 100,
+        },
+        quantity: 1,
+      }],
+      mode: 'payment',
+      success_url: `${process.env.FRONTEND_URL}/dashboard/jobs/${job._id}?payment=success`,
+      cancel_url: `${process.env.FRONTEND_URL}/dashboard/jobs/${job._id}?payment=cancelled`,
+      metadata: {
+        jobId: job._id.toString()
+      }
+    });
+
+    res.json({ sessionId: session.id });
+  } catch (error) {
+    next(new AppError('Error creating payment session', 500));
   }
 });
 
