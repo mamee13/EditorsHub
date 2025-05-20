@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Camera, Eye, EyeOff } from "lucide-react"
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { userService } from "@/services/user"
 
 export default function ResetPasswordPage() {
   const [code, setCode] = useState("")
@@ -29,21 +30,14 @@ export default function ResetPasswordPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      const response = await fetch("http://localhost:5000/api/users/reset-password", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ code, password, passwordConfirm: confirmPassword }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.message || "Failed to reset password")
+      const response = await userService.resetPassword(code, password, confirmPassword)
+      
+      if (response.error) {
+        throw new Error(response.error)
       }
 
       setMessage("Password reset successfully!")
-      router.push("/login") // Redirect to login page
+      router.push("/login")
     } catch (error: any) {
       console.error("Error resetting password:", error)
       setMessage(error.message || "An error occurred while resetting password.")

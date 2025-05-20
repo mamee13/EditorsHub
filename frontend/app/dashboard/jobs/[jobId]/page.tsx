@@ -113,8 +113,10 @@ const JobStatusBadge = ({ status }: { status: string }) => {
   );
 };
 
+
 export default function JobDetailsPage() {
   const router = useRouter()
+  const API_URL = process.env.NEXT_PUBLIC_API_URL;
   const { jobId } = useParams()
   const [job, setJob] = useState<any>(null)
   const [user, setUser] = useState<any>(null)
@@ -136,7 +138,7 @@ export default function JobDetailsPage() {
 
   const fetchJobAndUser = async () => {
     clearMessages();
-    setLoading(true); // Keep this for overall page load, individual actions have their own loaders
+    setLoading(true);
     try {
       const token = localStorage.getItem("token");
       if (!token) {
@@ -144,7 +146,7 @@ export default function JobDetailsPage() {
         return;
       }
 
-      const userResponse = await fetch('http://localhost:5000/api/users/me', {
+      const userResponse = await fetch(`${API_URL}/users/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!userResponse.ok) {
@@ -154,7 +156,7 @@ export default function JobDetailsPage() {
       const userData = await userResponse.json();
       setUser(userData);
 
-      const jobResponse = await fetch(`http://localhost:5000/api/jobs/${jobId}`, {
+      const jobResponse = await fetch(`${API_URL}/jobs/${jobId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!jobResponse.ok) throw new Error("Failed to fetch job details");
@@ -175,7 +177,7 @@ export default function JobDetailsPage() {
 
   const fetchApplicationsInternal = async (token: string) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/jobs/${jobId}/applications`, {
+      const response = await fetch(`${API_URL}/jobs/${jobId}/applications`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok) throw new Error("Failed to fetch applications");
@@ -221,7 +223,7 @@ export default function JobDetailsPage() {
         formData.append('files', selectedFiles[i]);
       }
 
-      const response = await fetch(`http://localhost:5000/api/jobs/${jobId}/submit`, {
+      const response = await fetch(`${API_URL}/jobs/${jobId}/submit`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData,
@@ -248,7 +250,7 @@ export default function JobDetailsPage() {
       const token = localStorage.getItem("token");
       if (!token) { router.push("/login"); return; }
 
-      const response = await fetch(`http://localhost:5000/api/jobs/${jobId}/payment`, {
+      const response = await fetch(`${API_URL}/jobs/${jobId}/payment`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
       });
@@ -277,7 +279,7 @@ export default function JobDetailsPage() {
       const token = localStorage.getItem("token");
       if (!token) { router.push("/login"); return; }
 
-      const response = await fetch(`http://localhost:5000/api/jobs/${jobId}/cancel`, {
+      const response = await fetch(`${API_URL}/jobs/${jobId}/cancel`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
       });
@@ -296,7 +298,7 @@ export default function JobDetailsPage() {
       const token = localStorage.getItem("token");
       if (!token) { router.push("/login"); return; }
 
-      const response = await fetch(`http://localhost:5000/api/jobs/${jobId}/assign`, {
+      const response = await fetch(`${API_URL}/jobs/${jobId}/assign`, {
         method: "PUT",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ editorId }),
@@ -322,7 +324,7 @@ export default function JobDetailsPage() {
       const token = localStorage.getItem("token");
       if (!token) { router.push("/login"); return; }
 
-      const response = await fetch(`http://localhost:5000/api/jobs/${jobId}/apply`, {
+      const response = await fetch(`${API_URL}/jobs/${jobId}/apply`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ message: applicationMessage }),

@@ -57,6 +57,7 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
+  const API_URL = process.env.NEXT_PUBLIC_API_URL
   const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [user, setUser] = useState<User | null>(null)
@@ -72,7 +73,7 @@ export default function DashboardLayout({
           return
         }
 
-        const response = await fetch('http://localhost:5000/api/users/me', {
+        const response = await fetch(`${API_URL}/users/me`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -95,7 +96,7 @@ export default function DashboardLayout({
     const fetchNotifications = async () => {
       try {
         const token = localStorage.getItem('token')
-        const response = await fetch('http://localhost:5000/api/notifications', {
+        const response = await fetch(`${API_URL}/notifications`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -118,7 +119,7 @@ export default function DashboardLayout({
   const markAsRead = async (notificationId: string) => {
     try {
       const token = localStorage.getItem('token')
-      await fetch(`http://localhost:5000/api/notifications/${notificationId}/read`, {
+      await fetch(`${API_URL}/notifications/${notificationId}/read`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -190,13 +191,13 @@ export default function DashboardLayout({
               <div className="border-t p-4">
                 <div className="flex items-center gap-3">
                   <img 
-                    src={user.profile.avatar || "/placeholder.svg"} 
-                    alt={user.profile.name} 
+                    src={user?.profile?.avatar || "/placeholder.svg"} 
+                    alt={user?.profile?.name || user?.name || "User"} 
                     className="h-10 w-10 rounded-full" 
                   />
                   <div>
-                    <p className="font-medium">{user.profile.name}</p>
-                    <p className="text-sm text-gray-500">{user.email}</p>
+                    <p className="font-medium">{user?.profile?.name || user?.name || "User"}</p>
+                    <p className="text-sm text-gray-500">{user?.email}</p>
                   </div>
                 </div>
                 <Button
@@ -290,8 +291,10 @@ export default function DashboardLayout({
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="flex items-center gap-2">
-                      <img src={user.profile.avatar || "/placeholder.svg"} alt={user.profile.name} className="h-8 w-8 rounded-full" />
-                      <span className="hidden md:block">{user.profile.name}</span>
+                      <img src={user?.profile?.avatar || "/placeholder.svg"} 
+                           alt={user?.profile?.name || user?.name || "User"} 
+                           className="h-8 w-8 rounded-full" />
+                      <span className="hidden md:block">{user?.profile?.name || user?.name || "User"}</span>
                       <ChevronDown className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>

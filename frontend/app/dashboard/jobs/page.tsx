@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 export default function JobsPage() {
+  const API_URL = process.env.NEXT_PUBLIC_API_URL
   const [user, setUser] = useState<{ role: string } | null>(null)
   const [activeJobs, setActiveJobs] = useState<any[]>([])
   const [completedJobs, setCompletedJobs] = useState<any[]>([])
@@ -25,7 +26,7 @@ export default function JobsPage() {
         }
 
         // Fetch user info
-        const userRes = await fetch("http://localhost:5000/api/users/me", {
+        const userRes = await fetch(`${API_URL}/users/me`, {
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
@@ -36,7 +37,7 @@ export default function JobsPage() {
         setUser(userData)
 
         // Fetch jobs
-        const jobsRes = await fetch("http://localhost:5000/api/jobs", {
+        const jobsRes = await fetch(`${API_URL}/jobs`, {
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",

@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea"
 
 export default function NewJobPage() {
   const router = useRouter()
+  const API_URL = process.env.NEXT_PUBLIC_API_URL
   const [files, setFiles] = useState<File[]>([])
   const [filePreviewUrls, setFilePreviewUrls] = useState<string[]>([])
   const [title, setTitle] = useState("")
@@ -64,7 +65,7 @@ export default function NewJobPage() {
     files.forEach((file) => formData.append("files", file))
 
     try {
-      const response = await fetch("http://localhost:5000/api/jobs", {
+      const response = await fetch(`${API_URL}/jobs`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,

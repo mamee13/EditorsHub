@@ -49,7 +49,7 @@ function isClientJob(job: ClientJob | EditorJob): job is ClientJob {
 interface User {
   name: string;
   role: "client" | "editor";
-  profile: {
+  profile?: {
     name: string;
     bio: string;
     avatar: string;
@@ -58,11 +58,12 @@ interface User {
 
 export default function DashboardPage() {
   const router = useRouter()
+  const API_URL = process.env.NEXT_PUBLIC_API_URL
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState<any>(null)
   const [recentJobs, setRecentJobs] = useState<(ClientJob | EditorJob)[]>([])
-  const [recentMessages, setRecentMessages] = useState<any[]>([]) // Add this line
+  const [recentMessages, setRecentMessages] = useState<any[]>([])
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -75,7 +76,7 @@ export default function DashboardPage() {
           }
 
           // Fetch user data
-          const userResponse = await fetch('http://localhost:5000/api/users/me', {
+          const userResponse = await fetch(`${API_URL}/users/me`, {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
@@ -87,7 +88,7 @@ export default function DashboardPage() {
           setUser(userData)
 
           // Fetch stats
-          const statsResponse = await fetch('http://localhost:5000/api/jobs/stats', {
+          const statsResponse = await fetch(`${API_URL}/jobs/stats`, {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
@@ -100,8 +101,8 @@ export default function DashboardPage() {
 
           // Fetch recent jobs - for editors, only fetch their assigned jobs
           const jobsEndpoint = userData.role === 'editor' 
-            ? 'http://localhost:5000/api/jobs/my-assignments'
-            : 'http://localhost:5000/api/jobs'
+            ? `${API_URL}/jobs/my-assignments`
+            : `${API_URL}/jobs`
           
           const jobsResponse = await fetch(jobsEndpoint, {
             headers: {
@@ -114,8 +115,8 @@ export default function DashboardPage() {
           const jobsData = await jobsResponse.json()
           setRecentJobs(jobsData)
 
-          // Add this after fetching jobs
-          const messagesResponse = await fetch('http://localhost:5000/api/messages/recent', {
+          // Fetch recent messages
+          const messagesResponse = await fetch(`${API_URL}/messages/recent`, {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
@@ -135,7 +136,7 @@ export default function DashboardPage() {
     }
 
     fetchDashboardData()
-  }, [router])
+  }, [router, API_URL])
 
   if (loading) {
     return <div className="flex h-screen items-center justify-center">Loading...</div>
@@ -159,7 +160,9 @@ export default function DashboardPage() {
     <div className="container py-8">
       <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Welcome back, {user.profile.name}</h1>
+          <h1 className="text-2xl font-bold tracking-tight">
+            Welcome back, {user?.profile?.name || user?.name || "User"}
+          </h1>
           <p className="text-muted-foreground">
             Here's what's happening with your {isClient ? "projects" : "editing jobs"} today.
           </p>

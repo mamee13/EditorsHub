@@ -1,4 +1,4 @@
-import { api } from '@/lib/utils';
+const API_URL = process.env.NEXT_PUBLIC_API_URL
 
 export interface ProfileUpdateData {
   name?: string;
@@ -9,32 +9,96 @@ export interface ProfileUpdateData {
 
 export const userService = {
   getCurrentUser: async () => {
-    return api.get('/users/me');
+    try {
+      const response = await fetch(`${API_URL}/users/me`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        }
+      });
+      return await response.json();
+    } catch (error) {
+      return { error: 'Failed to fetch user data' };
+    }
   },
 
   updateProfile: async (userId: string, data: ProfileUpdateData) => {
-    if (data.avatar) {
-      const formData = new FormData();
-      if (data.name) formData.append('name', data.name);
-      if (data.bio) formData.append('bio', data.bio);
-      if (data.portfolio) formData.append('portfolio', data.portfolio);
-      formData.append('avatar', data.avatar);
+    try {
+      if (data.avatar) {
+        const formData = new FormData();
+        if (data.name) formData.append('name', data.name);
+        if (data.bio) formData.append('bio', data.bio);
+        if (data.portfolio) formData.append('portfolio', data.portfolio);
+        formData.append('avatar', data.avatar);
+        
+        const response = await fetch(`${API_URL}/users/${userId}/profile`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          },
+          body: formData
+        });
+        return await response.json();
+      }
       
-      return api.uploadForm(`/users/${userId}/profile`, formData);
+      const response = await fetch(`${API_URL}/users/${userId}/profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify(data)
+      });
+      return await response.json();
+    } catch (error) {
+      return { error: 'Failed to update profile' };
     }
-    
-    return api.put(`/users/${userId}/profile`, data);
   },
 
   updatePassword: async (userId: string, currentPassword: string, newPassword: string, passwordConfirm: string) => {
-    return api.put(`/users/${userId}/password`, {
-      currentPassword,
-      newPassword,
-      passwordConfirm
-    });
+    try {
+      const response = await fetch(`${API_URL}/users/${userId}/password`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({ currentPassword, newPassword, passwordConfirm })
+      });
+      return await response.json();
+    } catch (error) {
+      return { error: 'Failed to update password' };
+    }
+  },
+
+  resetPassword: async (code: string, password: string, passwordConfirm: string) => {
+    try {
+      const response = await fetch(`${API_URL}/users/reset-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ code, password, passwordConfirm })
+      });
+      return await response.json();
+    } catch (error) {
+      return { error: 'Failed to reset password' };
+    }
   },
 
   updateRole: async (userId: string, role: 'client' | 'editor') => {
-    return api.put(`/users/${userId}/role`, { role });
+    try {
+      const response = await fetch(`${API_URL}/users/${userId}/role`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({ role })
+      });
+      return await response.json();
+    } catch (error) {
+      return { error: 'Failed to update role' };
+    }
   }
 };

@@ -11,12 +11,13 @@ import { useRouter } from "next/navigation"
 
 export default function MessageDetailPage({ params }: { params: { jobId: string } }) {
   const router = useRouter()
+  const API_URL = process.env.NEXT_PUBLIC_API_URL
   const [newMessage, setNewMessage] = useState("")
   const [user, setUser] = useState<any>(null)
   const [job, setJob] = useState<any>(null)
   const [messages, setMessages] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)  // Move this here
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -28,7 +29,7 @@ export default function MessageDetailPage({ params }: { params: { jobId: string 
         }
 
         // Fetch user data
-        const userResponse = await fetch("http://localhost:5000/api/users/me", {
+        const userResponse = await fetch(`${API_URL}/users/me`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -38,7 +39,7 @@ export default function MessageDetailPage({ params }: { params: { jobId: string 
         setUser(userData)
 
         // Fetch job details
-        const jobResponse = await fetch(`http://localhost:5000/api/jobs/${params.jobId}`, {
+        const jobResponse = await fetch(`${API_URL}/jobs/${params.jobId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -48,7 +49,7 @@ export default function MessageDetailPage({ params }: { params: { jobId: string 
         setJob(jobData)
 
         // Fetch messages
-        const messagesResponse = await fetch(`http://localhost:5000/api/messages/${params.jobId}`, {
+        const messagesResponse = await fetch(`${API_URL}/messages/${params.jobId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -91,7 +92,7 @@ export default function MessageDetailPage({ params }: { params: { jobId: string 
         formData.append("file", selectedFile)
       }
   
-      const response = await fetch("http://localhost:5000/api/messages", {
+      const response = await fetch(`${API_URL}/messages`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,

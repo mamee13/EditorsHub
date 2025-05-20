@@ -12,25 +12,25 @@ import { Label } from "@/components/ui/label"
 // import { Separator } from "@/components/ui/separator"
 
 export default function LoginPage() {
-  const router = useRouter() // Initialize useRouter
+  const router = useRouter()
+  const API_URL = process.env.NEXT_PUBLIC_API_URL
   const [showPassword, setShowPassword] = useState(false)
-  const [email, setEmail] = useState("") // Add state for email
-  const [password, setPassword] = useState("") // Add state for password
-  const [loading, setLoading] = useState(false) // Add state for loading
-  const [error, setError] = useState<string | null>(null) // Add state for error
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword)
   }
 
-  // Add onSubmit handler
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
 
     try {
-      const response = await fetch('http://localhost:5000/api/users/login', {
+      const response = await fetch(`${API_URL}/users/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -40,27 +40,21 @@ export default function LoginPage() {
 
       if (!response.ok) {
         const errorData = await response.json()
-        console.error('Login failed response:', response.status, errorData); // Log failed response
+        console.error('Login failed response:', response.status, errorData);
         throw new Error(errorData.message || 'Login failed')
       }
 
       const data = await response.json()
-      console.log('Login successful response data:', data); // Log successful response data
-
-      // Assuming your backend returns a token like { token: '...' }
-      if (data && data.token) { // Check if data and token exist
+      if (data && data.token) {
         localStorage.setItem('token', data.token)
-        console.log('Token stored, redirecting...'); // Log before redirect
-        router.push('/dashboard') // Redirect to dashboard on success
+        router.push('/dashboard')
       } else {
-        // Handle case where response is OK but no token is returned
-        console.error('Login successful but no token received:', data);
-        setError('Login successful, but no session token received. Please try again.');
+        console.error('Login successful but no token received:', data)
+        setError('Login successful, but no session token received. Please try again.')
       }
 
-
     } catch (err: any) {
-      console.error('Login error:', err) // Log any caught errors
+      console.error('Login error:', err)
       setError(err.message || 'An unexpected error occurred.')
     } finally {
       setLoading(false)

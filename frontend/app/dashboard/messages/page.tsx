@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation"
 
 export default function MessagesPage() {
   const router = useRouter()
+  const API_URL = process.env.NEXT_PUBLIC_API_URL
   // Update the user state type
   const [user, setUser] = useState<{ role: string; profile: { name: string } } | null>(null)
   const [conversations, setConversations] = useState<any[]>([])
@@ -24,7 +25,7 @@ export default function MessagesPage() {
         }
 
         // Fetch user data
-        const userResponse = await fetch("http://localhost:5000/api/users/me", {
+        const userResponse = await fetch(`${API_URL}/users/me`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -35,8 +36,8 @@ export default function MessagesPage() {
 
         // Fetch conversations based on user role
         const endpoint = userData.role === 'editor' 
-          ? "http://localhost:5000/api/jobs/my-assignments"  // Use my-assignments for editors
-          : "http://localhost:5000/api/jobs"                 // Use regular jobs endpoint for clients
+          ? `${API_URL}/jobs/my-assignments`  // Use my-assignments for editors
+          : `${API_URL}/jobs`                 // Use regular jobs endpoint for clients
 
         const conversationsResponse = await fetch(endpoint, {
           headers: {
@@ -62,7 +63,7 @@ export default function MessagesPage() {
     }
 
     fetchUserAndConversations()
-  }, [router])
+  }, [router, API_URL])
 
   if (loading) return <div>Loading...</div>
   if (!user) return null

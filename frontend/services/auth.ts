@@ -1,41 +1,88 @@
-import { api } from '@/lib/utils';
+const API_URL = process.env.NEXT_PUBLIC_API_URL
 
 export interface RegisterData {
-  email: string;
-  password: string;
-  passwordConfirm: string;
-  role: 'client' | 'editor';
+  email: string
+  password: string
+  passwordConfirm: string
+  role: 'client' | 'editor'
   profile: {
-    name: string;
-    bio: string;
-    avatar: string;
-    portfolio: string;
-  };
+    name: string
+    bio: string
+    avatar: string
+    portfolio: string
+    type?: 'photo' | 'video' | 'both'
+  }
 }
 
-export interface LoginData {
+interface VerifyEmailData {
   email: string;
-  password: string;
+  code: string;
 }
 
 export const authService = {
-  register: async (data: RegisterData) => {
-    return api.post('/users/register', data, false);
+  async register(data: RegisterData) {
+    try {
+      const response = await fetch(`${API_URL}/users/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      })
+
+      const responseData = await response.json()
+
+      if (!response.ok) {
+        return { error: responseData.message || 'Registration failed' }
+      }
+
+      return { data: responseData }
+    } catch (error) {
+      return { error: 'An error occurred during registration' }
+    }
+  },  // Added comma here
+
+  verifyEmailToken: async (token: string) => {
+    try {
+      const response = await fetch(`${API_URL}/users//verify-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        return { error: data.message || 'Verification failed' }
+      }
+
+      return { data }
+    } catch (error) {
+      return { error: 'An error occurred during verification' }
+    }
   },
 
-  login: async (data: LoginData) => {
-    return api.post('/users/login', data, false);
-  },
+  verifyEmail: async (data: VerifyEmailData) => {
+    try {
+      const response = await fetch(`${API_URL}/users/verify-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      })
 
-  forgotPassword: async (email: string) => {
-    return api.post('/users/forgot-password', { email }, false);
-  },
+      const responseData = await response.json()
 
-  resetPassword: async (token: string, password: string, passwordConfirm: string) => {
-    return api.post(`/users/reset-password/${token}`, { password, passwordConfirm }, false);
-  },
+      if (!response.ok) {
+        return { error: responseData.message || 'Verification failed' }
+      }
 
-  verifyEmail: async (data: { email: string; code: string }) => {
-    return api.post('/users/verify-email', data, false);
+      return { data: responseData }
+    } catch (error) {
+      return { error: 'An error occurred during verification' }
+    }
   }
-};
+}

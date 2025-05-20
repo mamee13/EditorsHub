@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
 
   export default function ProfilePage() {
+    const API_URL = process.env.NEXT_PUBLIC_API_URL
     const [user, setUser] = useState<any>(null)
     const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
     const [message, setMessage] = useState<string | null>(null)
@@ -31,7 +32,7 @@ import { Textarea } from "@/components/ui/textarea"
             return
           }
 
-          const response = await fetch("http://localhost:5000/api/users/me", {
+          const response = await fetch(`${API_URL}/users/me`, {
             headers: {
               Authorization: `Bearer ${token}`,
             },
@@ -51,7 +52,7 @@ import { Textarea } from "@/components/ui/textarea"
       }
 
       fetchUserData()
-    }, [])
+    }, [API_URL])
     useEffect(() => {
       if (message) {
         const timer = setTimeout(() => {
@@ -62,9 +63,6 @@ import { Textarea } from "@/components/ui/textarea"
       }
     }, [message])
   
-    // ... existing functions ...
-  
-
     const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0]
       if (file) {
@@ -90,7 +88,7 @@ import { Textarea } from "@/components/ui/textarea"
           formData.append('avatar', avatarFile)
         }
 
-        const response = await fetch(`http://localhost:5000/api/users/${user._id}/profile`, {
+        const response = await fetch(`${API_URL}/users/${user._id}/profile`, {
           method: "PUT",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -124,7 +122,7 @@ import { Textarea } from "@/components/ui/textarea"
         const token = localStorage.getItem("token")
         if (!token || !user?._id) return
 
-        const response = await fetch(`http://localhost:5000/api/users/${user._id}/password`, {
+        const response = await fetch(`${API_URL}/users/${user._id}/password`, {
           method: "PUT",
           headers: {
             Authorization: `Bearer ${token}`,

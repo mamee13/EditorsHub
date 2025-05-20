@@ -10,14 +10,15 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
 export default function ForgotPasswordPage() {
+  const router = useRouter()
+  const API_URL = process.env.NEXT_PUBLIC_API_URL
   const [email, setEmail] = useState("")
   const [message, setMessage] = useState<string | null>(null)
-  const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      const response = await fetch("http://localhost:5000/api/users/forgot-password", {
+      const response = await fetch(`${API_URL}/users/forgot-password`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -31,7 +32,7 @@ export default function ForgotPasswordPage() {
       }
 
       setMessage("Reset link sent successfully!")
-      router.push(`/reset-password?email=${encodeURIComponent(email)}`) // Redirect with email as query parameter
+      router.push(`/reset-password?email=${encodeURIComponent(email)}`)
     } catch (error: any) {
       console.error("Error sending reset link:", error)
       setMessage(error.message || "An error occurred while sending reset link.")
