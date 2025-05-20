@@ -67,39 +67,88 @@ router.get('/', verifyToken, async (req, res, next) => {
   }
 });
 
-// Apply for a job (Editor only)
-router.post('/:id/apply', verifyToken, async (req, res, next) => {
+router.get('/stats', verifyToken, async (req, res, next) => {
   try {
-    if (req.user.role !== 'editor') {
-      throw new AppError('Only editors can apply for jobs', 403);
+    const userId = req.user._id;
+    const role = req.user.role;
+
+    let stats = {
+      activeJobs: 0,
+      completedJobs: 0,
+      totalCount: 0,
+      unreadMessages: 0
+    };
+
+    if (role === 'editor') {
+      stats.activeJobs = await Job.countDocuments({ editorId: userId, status: 'in_progress' });
+      stats.completedJobs = await Job.countDocuments({ editorId: userId, status: 'completed' });
+      stats.totalCount = await Job.countDocuments({ editorId: userId });
+    } else {
+      stats.activeJobs = await Job.countDocuments({ clientId: userId, status: 'in_progress' });
+      stats.completedJobs = await Job.countDocuments({ clientId: userId, status: 'completed' });
+      stats.totalCount = await Job.countDocuments({ clientId: userId });
     }
 
-    const job = await Job.findById(req.params.id);
-    if (!job || job.status !== 'open') {
-      throw new AppError('Job not available', 400);
-    }
-
-    const application = await JobApplication.create({
-      jobId: job._id,
-      editorId: req.user._id,
-      message: req.body.message
-    });
-
-    await Notification.create({
-      userId: job.clientId,
-      type: 'new_application',
-      message: `New application received for job: ${job.title}`,
-      jobId: job._id
-    });
-
-    res.status(201).json(application);
+    stats.unreadMessages = 0;
+    res.json(stats);
   } catch (error) {
-    if (error instanceof AppError) {
-      return res.status(error.statusCode).json({ message: error.message });
-    }
-    next(new AppError('Error applying for job', 500));
+    next(error);
   }
 });
+
+router.get('/my-assignments', verifyToken, async (req, res, next) => {
+  try {
+    if (req.user.role !== 'editor') {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const assignments = await Job.find({
+      editorId: req.user._id,
+      status: { $in: ['assigned', 'in_progress', 'review'] }
+    })
+    .populate('clientId', 'profile.name')
+    .sort({ createdAt: -1 })
+    .limit(5);
+
+    res.json(assignments);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Apply for a job (Editor only)
+// router.post('/:id/apply', verifyToken, async (req, res, next) => {
+//   try {
+//     if (req.user.role !== 'editor') {
+//       throw new AppError('Only editors can apply for jobs', 403);
+//     }
+
+//     const job = await Job.findById(req.params.id);
+//     if (!job || job.status !== 'open') {
+//       throw new AppError('Job not available', 400);
+//     }
+
+//     const application = await JobApplication.create({
+//       jobId: job._id,
+//       editorId: req.user._id,
+//       message: req.body.message
+//     });
+
+//     await Notification.create({
+//       userId: job.clientId,
+//       type: 'new_application',
+//       message: `New application received for job: ${job.title}`,
+//       jobId: job._id
+//     });
+
+//     res.status(201).json(application);
+//   } catch (error) {
+//     if (error instanceof AppError) {
+//       return res.status(error.statusCode).json({ message: error.message });
+//     }
+//     next(new AppError('Error applying for job', 500));
+//   }
+// });
 
 // Assign editor to job (Client only)
 router.put('/:id/assign', verifyToken, async (req, res, next) => {
@@ -141,60 +190,6 @@ router.put('/:id/assign', verifyToken, async (req, res, next) => {
       return res.status(error.statusCode).json({ message: error.message });
     }
     next(new AppError('Error assigning editor', 500));
-  }
-});
-
-// Get specific job details
-// Update the job details route
-// Move these special routes BEFORE the /:jobId route
-// Add this route for job stats
-router.get('/stats', verifyToken, async (req, res, next) => {
-  try {
-    const userId = req.user._id;
-    const role = req.user.role;
-
-    let stats = {
-      activeJobs: 0,
-      completedJobs: 0,
-      totalCount: 0,
-      unreadMessages: 0
-    };
-
-    if (role === 'editor') {
-      stats.activeJobs = await Job.countDocuments({ editorId: userId, status: 'in_progress' });
-      stats.completedJobs = await Job.countDocuments({ editorId: userId, status: 'completed' });
-      stats.totalCount = await Job.countDocuments({ editorId: userId });
-    } else {
-      stats.activeJobs = await Job.countDocuments({ clientId: userId, status: 'in_progress' });
-      stats.completedJobs = await Job.countDocuments({ clientId: userId, status: 'completed' });
-      stats.totalCount = await Job.countDocuments({ clientId: userId });
-    }
-
-    stats.unreadMessages = 0;
-    res.json(stats);
-  } catch (error) {
-    next(error);
-  }
-});
-
-// Add this route to get editor's assigned jobs
-router.get('/my-assignments', verifyToken, async (req, res, next) => {
-  try {
-    if (req.user.role !== 'editor') {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
-    const assignments = await Job.find({
-      editorId: req.user._id,
-      status: { $in: ['assigned', 'in_progress', 'review'] }
-    })
-    .populate('clientId', 'profile.name')
-    .sort({ createdAt: -1 })
-    .limit(5);
-
-    res.json(assignments);
-  } catch (error) {
-    next(error);
   }
 });
 
@@ -393,6 +388,57 @@ router.post('/:id/payment', verifyToken, async (req, res, next) => {
     res.json({ sessionId: session.id });
   } catch (error) {
     next(new AppError('Error creating payment session', 500));
+  }
+});
+
+router.post('/:jobId/apply', verifyToken, async (req, res) => {
+  try {
+    const jobId = req.params.jobId;
+    const editorId = req.user._id;
+
+    // Check if job exists
+    const job = await Job.findById(jobId);
+    if (!job) {
+      return res.status(404).json({ message: 'Job not found' });
+    }
+
+    // Check if user has already applied
+    const existingApplication = await JobApplication.findOne({
+      jobId: jobId,
+      editorId: editorId
+    });
+
+    if (existingApplication) {
+      return res.status(400).json({ message: 'You have already applied for this job' });
+    }
+
+    // Create new application with the required message field
+    const application = new JobApplication({
+      jobId: jobId,
+      editorId: editorId,
+      status: 'pending',
+      message: req.body.message || req.body.coverLetter || '' // Try both fields and provide a default
+    });
+
+    if (!application.message) {
+      return res.status(400).json({ message: 'Application message is required' });
+    }
+
+    await application.save();
+
+    // Notify client about new application
+    await Notification.create({
+      userId: job.clientId,
+      type: 'new_application',
+      message: `New application received for job: ${job.title}`,
+      jobId: job._id
+    });
+
+    res.status(201).json({ message: 'Application submitted successfully', application });
+
+  } catch (error) {
+    console.error('Error in job application:', error);
+    res.status(500).json({ message: 'Error applying for job', error: error.message });
   }
 });
 

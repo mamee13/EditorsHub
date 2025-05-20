@@ -25,10 +25,6 @@ export default function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   
-  // Use Partial<RegisterData> for the state.
-  // Assuming RegisterData['profile'] might have 'type' based on original form code.
-  // If 'type' also causes an error, RegisterData['profile'] is simpler and 'type'
-  // should be removed from here and only added conditionally for editors.
   const [formData, setFormData] = useState<Partial<RegisterData>>({
     role: defaultRole as 'client' | 'editor',
     profile: {
@@ -36,7 +32,6 @@ export default function RegisterPage() {
       bio: '',
       avatar: '',
       portfolio: '',
-      // Reverted from specialization to type, assuming RegisterData from authService expects 'type'
       type: 'photo' as 'photo' | 'video' | 'both' 
     }
   })
@@ -57,7 +52,6 @@ export default function RegisterPage() {
             bio: '', 
             avatar: '', 
             portfolio: '', 
-            // Using type here too for consistency if a default profile is created
             type: 'photo' as 'photo' | 'video' | 'both' 
           };
           return {
@@ -82,11 +76,8 @@ export default function RegisterPage() {
     }
 
     setFormData(prev => {
-      // Ensure prev.profile exists or provide a default structure if it might not.
-      // Given the initial state, prev.profile should always exist.
       const currentProfile = prev.profile!; 
 
-      // 'type' is handled by its own select input's onChange for editors
       if (['name', 'bio', 'portfolio'].includes(fieldName)) {
         const profileFieldName = fieldName as 'name' | 'bio' | 'portfolio';
         return {
@@ -96,7 +87,7 @@ export default function RegisterPage() {
             [profileFieldName]: value
           }
         };
-      } else if (fieldName === 'type' && prev.role === 'editor') { // Explicitly handle 'type' if needed here, though select has its own
+      } else if (fieldName === 'type' && prev.role === 'editor') { 
         return {
           ...prev,
           profile: {
@@ -134,7 +125,6 @@ export default function RegisterPage() {
           bio: formData.profile?.bio || '',
           avatar: formData.profile?.avatar || '',
           portfolio: formData.profile?.portfolio || '',
-          // Conditionally add 'type' if the role is 'editor'
           ...( (formData.role === 'editor' && formData.profile?.type) && 
              { type: formData.profile.type as 'photo' | 'video' | 'both' }
           )
@@ -153,7 +143,7 @@ export default function RegisterPage() {
 
       if (completeFormData.role === 'editor') {
         requiredFields['Bio'] = completeFormData.profile.bio;
-        // @ts-ignore - profile might not have 'type' if user is client, but we check role
+        // @ts-ignore
         if (!completeFormData.profile.type) {
           // This check is more for internal logic, as the select has a default.
           // throw new Error('Please select an editor type.');
@@ -188,26 +178,21 @@ export default function RegisterPage() {
   const handleRoleChange = (newRole: string) => {
     setFormData(prev => {
       const updatedFormData: Partial<RegisterData> = {
-        ...prev, // Keep common fields like email, password etc.
+        ...prev, 
         role: newRole as 'client' | 'editor',
-        profile: { // Reset or adjust profile based on role
-          name: prev.profile?.name || '', // Keep name if already entered
-          bio: prev.profile?.bio || '', // Keep bio
-          avatar: prev.profile?.avatar || '', // Keep avatar
-          portfolio: prev.profile?.portfolio || '', // Keep portfolio
-          // Only include 'type' if the new role is 'editor', default it.
+        profile: { 
+          name: prev.profile?.name || '', 
+          bio: prev.profile?.bio || '', 
+          avatar: prev.profile?.avatar || '', 
+          portfolio: prev.profile?.portfolio || '', 
           ...(newRole === 'editor' && { type: prev.profile?.type || 'photo' })
         }
       };
-       // If switching to client and profile had a 'type', clean it up if RegisterData for client profile doesn't expect it
       if (newRole === 'client' && updatedFormData.profile && 'type' in updatedFormData.profile) {
-        // This assumes RegisterData['profile'] for client doesn't have 'type'
-        // delete (updatedFormData.profile as any).type; // Be careful with 'any'
+        // delete (updatedFormData.profile as any).type; 
       }
       return updatedFormData;
     });
-    // Clear avatar preview if rolespecific logic for it exists or form fields change significantly
-    // setAvatarPreview(null); // Optional: reset avatar preview on role change
   };
 
   const togglePasswordVisibility = () => setShowPassword(!showPassword)
@@ -258,6 +243,7 @@ export default function RegisterPage() {
                       required 
                       value={formData.profile?.name || ''}
                       onChange={handleInputChange}
+                      className="border-gray-300 dark:border-gray-600"
                     />
                   </div>
                   <div className="grid gap-2">
@@ -269,6 +255,7 @@ export default function RegisterPage() {
                       required 
                       value={formData.email || ''}
                       onChange={handleInputChange}
+                      className="border-gray-300 dark:border-gray-600"
                     />
                   </div>
                   <div className="grid gap-2">
@@ -281,6 +268,7 @@ export default function RegisterPage() {
                         required 
                         value={formData.password || ''}
                         onChange={handleInputChange}
+                        className="border-gray-300 dark:border-gray-600"
                       />
                       <Button
                         type="button"
@@ -308,6 +296,7 @@ export default function RegisterPage() {
                         required
                         value={formData.passwordConfirm || ''}
                         onChange={handleInputChange}
+                        className="border-gray-300 dark:border-gray-600"
                       />
                       <Button
                         type="button"
@@ -328,7 +317,7 @@ export default function RegisterPage() {
                   <div className="grid gap-2">
                     <Label htmlFor="avatar">Profile Picture (Optional)</Label>
                     <div className="flex items-center gap-4">
-                      <div className="relative h-16 w-16 overflow-hidden rounded-full border bg-gray-100">
+                      <div className="relative h-16 w-16 overflow-hidden rounded-full border border-gray-300 dark:border-gray-600 bg-gray-100">
                         {avatarPreview ? (
                           <img
                             src={avatarPreview}
@@ -344,7 +333,7 @@ export default function RegisterPage() {
                       <div className="flex-1">
                         <Label
                           htmlFor="avatar-upload"
-                          className="flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 hover:bg-gray-50"
+                          className="flex cursor-pointer items-center gap-2 rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 hover:bg-gray-50"
                         >
                           <Upload className="h-4 w-4" />
                           <span>Upload</span>
@@ -352,7 +341,7 @@ export default function RegisterPage() {
                             id="avatar-upload" 
                             type="file"
                             accept="image/*"
-                            className="hidden"
+                            className="hidden" // Border on hidden input is not visible
                             onChange={handleAvatarChange}
                           />
                         </Label>
@@ -364,7 +353,7 @@ export default function RegisterPage() {
                     <Textarea
                       id="bio"
                       placeholder="Tell us a bit about yourself or your company"
-                      className="resize-none"
+                      className="resize-none border-gray-300 dark:border-gray-600"
                       value={formData.profile?.bio || ''}
                       onChange={handleInputChange}
                     />
@@ -377,6 +366,7 @@ export default function RegisterPage() {
                       placeholder="https://yourportfolio.com" 
                       value={formData.profile?.portfolio || ''}
                       onChange={handleInputChange}
+                      className="border-gray-300 dark:border-gray-600"
                     />
                   </div>
                   <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700" disabled={isLoading}>
@@ -397,6 +387,7 @@ export default function RegisterPage() {
                       required 
                       value={formData.profile?.name || ''}
                       onChange={handleInputChange}
+                      className="border-gray-300 dark:border-gray-600"
                     />
                   </div>
                   <div className="grid gap-2">
@@ -408,6 +399,7 @@ export default function RegisterPage() {
                       required 
                       value={formData.email || ''}
                       onChange={handleInputChange}
+                      className="border-gray-300 dark:border-gray-600"
                     />
                   </div>
                   <div className="grid gap-2">
@@ -420,6 +412,7 @@ export default function RegisterPage() {
                         required
                         value={formData.password || ''}
                         onChange={handleInputChange}
+                        className="border-gray-300 dark:border-gray-600"
                       />
                        <Button
                         type="button"
@@ -447,6 +440,7 @@ export default function RegisterPage() {
                         required
                         value={formData.passwordConfirm || ''}
                         onChange={handleInputChange}
+                        className="border-gray-300 dark:border-gray-600"
                       />
                        <Button
                         type="button"
@@ -467,7 +461,7 @@ export default function RegisterPage() {
                   <div className="grid gap-2">
                     <Label htmlFor="editor-avatar">Profile Picture</Label>
                     <div className="flex items-center gap-4">
-                       <div className="relative h-16 w-16 overflow-hidden rounded-full border bg-gray-100">
+                       <div className="relative h-16 w-16 overflow-hidden rounded-full border border-gray-300 dark:border-gray-600 bg-gray-100">
                         {avatarPreview ? (
                           <img
                             src={avatarPreview}
@@ -483,7 +477,7 @@ export default function RegisterPage() {
                       <div className="flex-1">
                         <Label
                           htmlFor="editor-avatar-upload"
-                          className="flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 hover:bg-gray-50"
+                          className="flex cursor-pointer items-center gap-2 rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 hover:bg-gray-50"
                         >
                           <Upload className="h-4 w-4" />
                           <span>Upload</span>
@@ -491,7 +485,7 @@ export default function RegisterPage() {
                             id="editor-avatar-upload"
                             type="file"
                             accept="image/*"
-                            className="hidden"
+                            className="hidden" // Border on hidden input is not visible
                             onChange={handleAvatarChange} 
                           />
                         </Label>
@@ -503,24 +497,23 @@ export default function RegisterPage() {
                     <Textarea
                       id="editor-bio"
                       placeholder="Tell clients about your experience and skills"
-                      className="resize-none"
+                      className="resize-none border-gray-300 dark:border-gray-600"
                       required
                       value={formData.profile?.bio || ''}
                       onChange={handleInputChange}
                     />
                   </div>
-                  {/* Changed back to 'type' from 'specialization' */}
                   <div className="grid gap-2">
                     <Label htmlFor="editor-type">Editor Type</Label> 
                     <select
-                      id="editor-type" // Use 'editor-type'
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
-                      value={formData.profile?.type || 'photo'} // Use 'type'
+                      id="editor-type" 
+                      className="flex h-10 w-full rounded-md border border-gray-300 dark:border-gray-600 bg-background px-3 py-2 text-sm ring-offset-background"
+                      value={formData.profile?.type || 'photo'} 
                       onChange={(e) => setFormData(prev => ({
                         ...prev,
                         profile: {
                           ...prev.profile!,
-                          type: e.target.value as 'photo' | 'video' | 'both' // Set 'type'
+                          type: e.target.value as 'photo' | 'video' | 'both' 
                         }
                       }))}
                     >
@@ -532,11 +525,12 @@ export default function RegisterPage() {
                   <div className="grid gap-2">
                     <Label htmlFor="editor-portfolio">Portfolio URL (Optional)</Label>
                     <Input 
-                      id="editor-portfolio" // It's good practice to have unique IDs if they are on same page, even if handled
+                      id="editor-portfolio" 
                       type="url" 
                       placeholder="https://yourportfolio.com" 
                       value={formData.profile?.portfolio || ''}
                       onChange={handleInputChange}
+                      className="border-gray-300 dark:border-gray-600"
                     />
                   </div>
                   <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700" disabled={isLoading}>

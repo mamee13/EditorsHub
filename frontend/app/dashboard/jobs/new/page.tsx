@@ -117,12 +117,12 @@ export default function NewJobPage() {
                   required
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                />
+                  className="border-2 border-muted-foreground/50 focus:border-ring"                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="category">Category</Label>
                 <Select required value={category} onValueChange={setCategory}>
-                  <SelectTrigger id="category">
+                  <SelectTrigger id="category" className="border-2 border-muted-foreground/50 focus:border-ring">
                     <SelectValue placeholder="Select a category" />
                   </SelectTrigger>
                   <SelectContent>
@@ -140,7 +140,7 @@ export default function NewJobPage() {
               <Textarea
                 id="description"
                 placeholder="Describe your project in detail. Include specific requirements, style preferences, and any other relevant information."
-                className="min-h-[120px]"
+                className="min-h-[120px] border-2 border-muted-foreground/50 focus:border-ring"
                 required
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -158,7 +158,7 @@ export default function NewJobPage() {
                   required
                   value={budget}
                   onChange={(e) => setBudget(e.target.value)}
-                />
+                  className="border-2 border-muted-foreground/50 focus:border-ring"                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="deadline">Deadline</Label>
@@ -168,7 +168,7 @@ export default function NewJobPage() {
                   required
                   value={deadline}
                   onChange={(e) => setDeadline(e.target.value)}
-                />
+                  className="border-2 border-muted-foreground/50 focus:border-ring"                />
               </div>
             </div>
 

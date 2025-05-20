@@ -20,39 +20,41 @@ const config = {
     },
     extend: {
       colors: {
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
-        background: "#ffffff", // Set background to white
-        foreground: "#000000", // Set text color to black
+        border: "#94a3b8",      // Changed to a darker gray (Slate-400)
+        input: "#e2e8f0",       // Slightly darker input background
+        ring: "#6366f1",        // Keeping the indigo focus ring
+        background: "#ffffff",   // White background
+        foreground: "#1e293b",  // Dark slate for text
         primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
+          DEFAULT: "#4f46e5",   // Indigo-600
+          foreground: "#ffffff",
         },
         secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
+          DEFAULT: "#f1f5f9",   // Slate-100
+          foreground: "#1e293b",
         },
         destructive: {
-          DEFAULT: "hsl(var(--destructive))",
-          foreground: "hsl(var(--destructive-foreground))",
+          DEFAULT: "#ef4444",   // Red-500
+          foreground: "#ffffff",
         },
         muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
+          DEFAULT: "#f8fafc",   // Slate-50
+          foreground: "#64748b", // Slate-500
         },
         accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
+          DEFAULT: "#f1f5f9",   // Slate-100
+          foreground: "#0f172a",
         },
         popover: {
-          DEFAULT: "hsl(var(--popover))",
-          foreground: "hsl(var(--popover-foreground))",
+          DEFAULT: "#ffffff",
+          foreground: "#1e293b",
         },
         card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
+          DEFAULT: "#ffffff",
+          foreground: "#1e293b",
+          border: "#cbd5e1",    // Added specific card border color (Slate-300)
         },
+        // Keep your existing indigo colors
         indigo: {
           50: "#eef2ff",
           100: "#e0e7ff",

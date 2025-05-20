@@ -80,11 +80,11 @@ export default function Home() {
               <div className="mx-auto lg:mx-0 relative">
                 <div className="absolute inset-0 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-3xl -rotate-1"></div>
                 <img
-                  src="/placeholder.svg?height=500&width=500"
-                  alt="EditorsHub Platform"
+                  src="/images/editor-hero.png"
+                  alt="Professional editor working on content"
                   width={500}
                   height={500}
-                  className="relative mx-auto aspect-square overflow-hidden rounded-2xl object-cover"
+                  className="relative mx-auto aspect-square overflow-hidden rounded-2xl object-cover shadow-lg"
                 />
               </div>
             </div>

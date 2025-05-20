@@ -199,9 +199,9 @@ import { Textarea } from "@/components/ui/textarea"
                 <CardDescription>Update your personal details</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Full Name</Label>
+                <div className="grid gap-4 md:grid-cols-2 " >
+                  <div className="space-y-2 ">
+                    <Label htmlFor="name ">Full Name</Label>
                     <Input
                       id="name"
                       value={user.profile?.name || ""}
