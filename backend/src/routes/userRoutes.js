@@ -1,6 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const { verifyToken } = require('../middleware/authMiddleware');
 const User = require('../models/userModel'); // Fix: Changed UserModel to userModel
 const { verifyToken, generateToken } = require('../middleware/authMiddleware');
 const { uploadFile, deleteFile } = require('../config/cloudinary');
