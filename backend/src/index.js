@@ -27,6 +27,41 @@ const io = socketIo(server, {
 // Store io instance
 app.set('io', io);
 
+app.use(helmet({
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      defaultSrc: ["'self'"],
+      connectSrc: [
+        "'self'",
+        process.env.FRONTEND_URL || 'http://localhost:3000',
+        'ws:',
+        'wss:'
+      ],
+      imgSrc: ["'self'", "data:", "blob:", "https:"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      fontSrc: ["'self'", "https:", "data:"],
+      mediaSrc: ["'self'", "https:", "data:"],
+    }
+  },
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
+
+// Updated CORS configuration
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['Authorization']
+}));
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(morgan('dev'));
+
 // Socket.IO connection handling
 io.on('connection', (socket) => {
   console.log('Client connected');
@@ -39,18 +74,6 @@ io.on('connection', (socket) => {
     console.log('Client disconnected');
   });
 });
-
-// Middleware
-app.use(express.json());
-// Update CORS configuration with more specific options
-app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
-app.use(helmet());
-app.use(morgan('dev'));
 
 // Routes
 app.use('/api/users', userRoutes);
