@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const User = require('../models/UserModel');
+const User = require('../models/userModel'); // Fix: Changed UserModel to userModel
 const AppError = require('../utils/AppError');
 
 const verifyToken = async (req, res, next) => {
