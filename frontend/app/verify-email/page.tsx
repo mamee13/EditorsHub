@@ -1,8 +1,9 @@
 "use client"
 
 export const dynamic = 'force-dynamic'
+export const runtime = 'edge'
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Camera, CheckCircle, XCircle } from "lucide-react"
@@ -17,9 +18,14 @@ export default function VerifyEmailPage() {
   const searchParams = useSearchParams()
   const email = searchParams.get("email")
   
+  const [mounted, setMounted] = useState(false)
   const [verificationCode, setVerificationCode] = useState("")
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [error, setError] = useState("")
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -30,17 +36,16 @@ export default function VerifyEmailPage() {
       if (!email) throw new Error("Email is required")
       if (!verificationCode) throw new Error("Please enter the verification code")
       
-      // Make sure to send data as a proper JSON object
       const response = await authService.verifyEmail({
         email: email,
-        code: verificationCode.toString() // Ensure code is sent as string
+        code: verificationCode.toString()
       })
 
       if (response.error) {
         throw new Error(response.error)
       }
 
-      if (response.data?.token) {
+      if (response.data?.token && mounted) {
         localStorage.setItem('token', response.data.token)
         setStatus('success')
         router.push('/dashboard')
@@ -51,6 +56,10 @@ export default function VerifyEmailPage() {
       setStatus('error')
       setError(error instanceof Error ? error.message : 'Verification failed')
     }
+  }
+
+  if (!mounted) {
+    return null
   }
 
   if (!email) {
