@@ -19,8 +19,27 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: process.env.FRONTEND_URL,
-    methods: ['GET', 'POST']
+    origin: function (origin, callback) {
+      // Allow requests with no origin (mobile apps)
+      if (!origin) return callback(null, true);
+
+      const isAllowed = allowedOrigins.some(allowedOrigin => {
+        if (typeof allowedOrigin === 'string') {
+          return allowedOrigin === origin;
+        } else if (allowedOrigin instanceof RegExp) {
+          return allowedOrigin.test(origin);
+        }
+        return false;
+      });
+
+      if (isAllowed) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    methods: ['GET', 'POST'],
+    credentials: true
   }
 });
 
@@ -35,6 +54,9 @@ app.use(helmet({
       connectSrc: [
         "'self'",
         process.env.FRONTEND_URL || 'http://localhost:3000',
+        'http://localhost:8080', // Flutter web
+        'http://10.0.2.2:8080', // Android emulator
+        'http://192.168.1.1:8080', // Physical device (update IP)
         'ws:',
         'wss:'
       ],
@@ -50,11 +72,40 @@ app.use(helmet({
 }));
 
 // Updated CORS configuration
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  'http://localhost:3000', // React dev server
+  'http://localhost:8080', // Flutter web
+  'http://10.0.2.2:8080', // Android emulator
+  'http://192.168.8.3:8080', // Replace with your computer's IP for physical devices
+  'http://localhost:5000', // For testing
+  /^https?:\/\/.*\.yourdomain\.com$/, // Production domain pattern
+];
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+
+    // Check if origin is in allowed list
+    const isAllowed = allowedOrigins.some(allowedOrigin => {
+      if (typeof allowedOrigin === 'string') {
+        return allowedOrigin === origin;
+      } else if (allowedOrigin instanceof RegExp) {
+        return allowedOrigin.test(origin);
+      }
+      return false;
+    });
+
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
   exposedHeaders: ['Authorization']
 }));
 
